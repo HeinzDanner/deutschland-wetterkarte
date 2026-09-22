@@ -1,7 +1,16 @@
 # deutschland-wetterkarte
 
-## Plan Wetterapp
+Dieses Repository enthält den initialisierten Startpunkt für das separate Wetterkarten-Projekt unter:
 
-Hier ist Platz für den Inhalt aus deinem PDF-Plan.
+- `/home/runner/work/deutschland-wetterkarte/deutschland-wetterkarte/weather-map-germany`
 
-Wenn du mir den Text gibst (oder Screenshots), trage ich ihn hier strukturiert ein.
+## Zugriff
+
+- Lokal im Terminal:
+  - `cd /home/runner/work/deutschland-wetterkarte/deutschland-wetterkarte/weather-map-germany`
+- Frontend starten:
+  - `cd /home/runner/work/deutschland-wetterkarte/deutschland-wetterkarte/weather-map-germany/frontend`
+  - `npm run dev`
+- BFF starten:
+  - `cd /home/runner/work/deutschland-wetterkarte/deutschland-wetterkarte/weather-map-germany/bff`
+  - `npm run dev`
