@@ -3,6 +3,7 @@ import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
 import OSM from 'ol/source/OSM'
+import { fromLonLat } from 'ol/proj'
 import 'ol/ol.css'
 import './App.css'
 
@@ -22,7 +23,7 @@ function App() {
         }),
       ],
       view: new View({
-        center: [1170000, 6590000],
+        center: fromLonLat([10.45, 51.16]),
         zoom: 5.5,
       }),
     })
