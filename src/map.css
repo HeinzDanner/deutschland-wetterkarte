@@ -1,0 +1,18 @@
+﻿.ol-control button {
+  background: #0b1f33;
+}
+
+.ol-control button:hover,
+.ol-control button:focus {
+  background: #16456c;
+}
+
+.ol-attribution {
+  font-size: 10px;
+}
+
+/* Screen blending only brightens, so dark IR areas no longer dim the base map. */
+.satellite-layer {
+  mix-blend-mode: screen;
+  filter: contrast(1.9) brightness(1.25);
+}

@@ -1,3 +1,35 @@
+Lokaler Start
+============
+In zwei Terminals im Projektordner `npm run api` und `npm run dev` starten.
+Die Webseite ist unter http://localhost:5173 erreichbar.
+
+Das Stationsnetz enthält 100 ausgewählte DWD-POI-Stationen. Die Kennungen und
+Koordinaten wurden mit dem Meteostat-Stationsverzeichnis abgeglichen.
+Der API-Prozess hält einen gemeinsamen In-Memory-Cache für fünf Minuten;
+gleichzeitige Nutzer teilen dieselbe Aktualisierung. Maximal sechs DWD-Anfragen
+laufen parallel, jede mit 15 Sekunden Timeout. Fehlende Quellen werden im
+Layer-Menü ausgewiesen. Der Cache gilt pro API-Prozess und wird beim Neustart geleert.
+Die Webseite lädt Stationsdaten bei aktivem Layer alle fünf Minuten nach.
+Gelbe Gruppenpunkte zeigen die Durchschnittstemperatur (Ø) ihrer Stationen; ab Zoomstufe 8 erscheinen alle
+Einzelpunkte. Beim Klick auf eine Gruppe zoomt die Karte zu ihren Stationen.
+Das aktuelle DWD-Niederschlagsradar bietet im Zeitparameter Fünf-Minuten-
+Schritte. `/api/radar/times` liest den veröffentlichten Zeitbereich aus den
+WMS-Capabilities und liefert die verfügbaren Zeitpunkte der letzten Stunde;
+auch diese Antwort wird pro API-Prozess fünf Minuten zwischengespeichert.
+Die letzte Stunde endet am DWD-Analysezeitpunkt (`REFERENCE_TIME`), nicht am
+Ende des RV-Vorhersagebereichs. Zukünftige Zeitpunkte sind ausgeschlossen.
+Bis die Zeitmetadaten geladen sind, bleibt das Radar ausgeblendet, damit das
+WMS-Standardbild (`current`) keine Vorhersage als aktuelle Beobachtung zeigt.
+Die Animation lädt pro Zeitpunkt ein vollständiges WMS-Bild des Kartenausschnitts
+vor und tauscht es erst nach erfolgreichem Laden aus. Zwischen fertigen Bildern
+liegen mindestens 200 Millisekunden; langsamere Downloads verlängern die Wartezeit.
+Bei Fehlern oder nach 20 Sekunden Ladezeit stoppt die Animation mit einer Meldung.
+Die angezeigte Beobachtungszeit gehört zum zuletzt fertig geladenen Bild.
+Die nächsten zwei Zeitpunkte werden parallel vorgeladen (maximal drei laufende
+Bildabrufe). Fertige Bilder der aktuellen Radarstunde bleiben im Browserbuffer.
+Beim Verschieben, Zoomen oder Ändern der Kartengröße wird dieser Buffer erneuert;
+eine wiederholte Wiedergabe desselben Ausschnitts verwendet bereits geladene Bilder.
+
 Plan
 Hier ist die Datenquellen-Matrix in endgültiger V1-Form — kompakt,
 entscheidungsorientiert und auf geringen Aufwand bei geringem Risiko ausgelegt.
@@ -4141,3 +4173,7 @@ Arbeitspaketplan entstehen:
 • in welcher Reihenfolge
 • was jeweils als „fertig“ gilt
 • wo die Risiken sitzen
+
+## Satellit
+
+Der Layer "Satellit Infrarot" nutzt den EUMETSAT-WMS (msg_fes:ir108, Meteosat, 15-Minuten-Takt). /api/satellite/times liefert die letzten 13 Aufnahmezeitpunkte (3 Stunden) und wird fünf Minuten gecacht. Die Bilder sind etwa eine Stunde verzögert; es gibt Zeit-Slider und Deckkraftregler, aber noch keine Animation. Der DWD-Satellitenlayer wurde verworfen, da er nur alle 3 Stunden aktualisiert wird.
