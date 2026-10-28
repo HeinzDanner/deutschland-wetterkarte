@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Feature from 'ol/Feature'
 import Map from 'ol/Map'
 import View from 'ol/View'
@@ -11,29 +11,24 @@ import VectorSource from 'ol/source/Vector'
 import Cluster from 'ol/source/Cluster'
 import { Circle, Fill, Stroke, Style, Text } from 'ol/style'
 import XYZ from 'ol/source/XYZ'
-import { fromLonLat } from 'ol/proj'
+import { fromLonLat, toLonLat } from 'ol/proj'
 import { boundingExtent } from 'ol/extent'
-import Polygon from 'ol/geom/Polygon'
 import { apply as applyTransform } from 'ol/transform'
 import type { FrameState } from 'ol/Map'
 import germanyRings from './data/germany.json'
-import { getEuropePrecipitationFrames, getRadarFrames, getSatelliteFrames, getStations, type WeatherStation } from './stations'
+import { getRadarFrames, getSatelliteFrames, getStations, type WeatherStation } from './stations'
 import { createRadarBuffer } from './radarBuffer'
 import { StationForecast } from './StationForecast'
+import { OperaRadar } from './OperaRadar'
+import { WeatherWarnings } from './WeatherWarnings'
+import { LocationSearch, type ForecastLocation } from './LocationSearch'
+import { useLanguage } from './i18n'
+import { DEFAULT_VIEW, DEFAULT_LAYERS, MAP_VIEW_KEY, MAP_LAYERS_KEY, readPreference, savePreference, validView, validLayers } from './mapPreferences'
 import './map.css'
 
 const EUMETSAT_WMS_URL = 'https://view.eumetsat.int/geoserver/ows'
 const SATELLITE_LAYER = 'msg_fes:ir108'
-const EUROPE_PRECIPITATION_LAYER = 'msg_fes:h60b'
-const EUROPE_FRAME_MS = 15 * 60 * 1000
-
-// Maps a 5-minute radar time onto the 15-minute EUMETSAT slot that is already published.
-function europeSlot(radarTime: string, frames: string[]) {
-  if (frames.length === 0) return null
-  const slot = new Date(Math.floor(Date.parse(radarTime) / EUROPE_FRAME_MS) * EUROPE_FRAME_MS).toISOString()
-  if (slot < frames[0]) return frames[0]
-  return slot > frames[frames.length - 1] ? frames[frames.length - 1] : slot
-}
+const DWD_RADAR_FALLBACK_ENABLED = false
 const DWD_WMS_URL = 'https://maps.dwd.de/geoserver/ows'
 const RADAR_LAYER = 'dwd:Niederschlagsradar'
 const RADAR_LEGEND_URL =
@@ -55,39 +50,25 @@ function germanyClipPath(context: CanvasRenderingContext2D, frameState: FrameSta
 }
 
 // Limits a layer to Germany (or to everything outside) by clipping the canvas while it renders.
-function clipLayerToGermany(layer: ImageLayer<ImageWMS>, outside: boolean, filter?: string) {
+function clipLayerToGermany(layer: ImageLayer<ImageWMS>, outside: boolean) {
   layer.on('prerender', (event) => {
     const context = event.context as CanvasRenderingContext2D
     if (!event.frameState) return
     context.save()
     germanyClipPath(context, event.frameState, outside)
-    if (filter) context.filter = filter
   })
   layer.on('postrender', (event) => {
     (event.context as CanvasRenderingContext2D).restore()
   })
 }
 
-function createGermanyMaskLayer() {
-  const world = [[-20037508, -20037508], [-20037508, 20037508], [20037508, 20037508], [20037508, -20037508], [-20037508, -20037508]]
-  const holes = (germanyRings as number[][][]).map((ring) => ring.map(([lon, lat]) => fromLonLat([lon, lat])))
-  const border = holes.map((ring) => new Style({
-    stroke: new Stroke({ color: '#0b1f33', width: 2 }),
-    geometry: new Polygon([ring]),
-  }))
-
-  return new VectorLayer({
-    source: new VectorSource({ features: [new Feature(new Polygon([world, ...holes]))] }),
-    style: [
-      new Style({ fill: new Fill({ color: 'rgba(30, 41, 54, 0.45)' }) }),
-      ...border,
-    ],
-    updateWhileAnimating: true,
-    updateWhileInteracting: true,
-  })
-}
-
 function App() {
+  const [initialView] = useState(() => readPreference(MAP_VIEW_KEY, DEFAULT_VIEW, validView))
+  const [initialLayers] = useState(() => readPreference(MAP_LAYERS_KEY, DEFAULT_LAYERS, validLayers))
+  const [warningsVisible, setWarningsVisible] = useState(initialLayers.warnings)
+  const { language, locale, t, setLanguage } = useLanguage()
+  const localization = useRef({ locale, t })
+  localization.current = { locale, t }
   const mapElement = useRef<HTMLDivElement>(null)
   const map = useRef<Map | null>(null)
   const stationLayer = useRef<VectorLayer<Cluster<Feature<Point>>> | null>(null)
@@ -95,8 +76,8 @@ function App() {
   const radarLayer = useRef<ImageLayer<ImageWMS> | null>(null)
   const radarBuffer = useRef<ReturnType<typeof createRadarBuffer> | null>(null)
   const satelliteLayer = useRef<ImageLayer<ImageWMS> | null>(null)
-  const [satelliteVisible, setSatelliteVisible] = useState(false)
-  const [satelliteOpacity, setSatelliteOpacity] = useState(0.95)
+  const [satelliteVisible, setSatelliteVisible] = useState(initialLayers.satellite)
+  const [satelliteOpacity, setSatelliteOpacity] = useState(initialLayers.satelliteOpacity)
   const [satelliteFrames, setSatelliteFrames] = useState<string[]>([])
   const [satelliteFrameIndex, setSatelliteFrameIndex] = useState(0)
   const [satelliteError, setSatelliteError] = useState<string | null>(null)
@@ -105,10 +86,8 @@ function App() {
   const [satelliteImageLoading, setSatelliteImageLoading] = useState(false)
   const [satelliteImageError, setSatelliteImageError] = useState<string | null>(null)
   const [displayedSatelliteTime, setDisplayedSatelliteTime] = useState<string | null>(null)
-  const europeLayer = useRef<ImageLayer<ImageWMS> | null>(null)
-  const europeBuffer = useRef<ReturnType<typeof createRadarBuffer> | null>(null)
-  const [europeFrames, setEuropeFrames] = useState<string[]>([])
-  const [radarVisible, setRadarVisible] = useState(true)
+  const [radarVisible, setRadarVisible] = useState(false)
+  const [operaVisible, setOperaVisible] = useState(initialLayers.opera)
   const [radarFrames, setRadarFrames] = useState<string[]>([])
   const [radarFrameIndex, setRadarFrameIndex] = useState(0)
   const [radarFramesLoading, setRadarFramesLoading] = useState(false)
@@ -118,14 +97,64 @@ function App() {
   const [radarImageError, setRadarImageError] = useState<string | null>(null)
   const [displayedRadarTime, setDisplayedRadarTime] = useState<string | null>(null)
   const [radarViewport, setRadarViewport] = useState(0)
-  const [stationsVisible, setStationsVisible] = useState(false)
+  const [stationsVisible, setStationsVisible] = useState(initialLayers.stations)
   const [stations, setStations] = useState<WeatherStation[]>([])
   const [radarReload, setRadarReload] = useState(0)
   const [satelliteReload, setSatelliteReload] = useState(0)
   const [stationError, setStationError] = useState<string | null>(null)
-  const [stationWarning, setStationWarning] = useState<string | null>(null)
+  const [stationWarning, setStationWarning] = useState<{ unavailable: number; total: number } | null>(null)
   const [selectedStation, setSelectedStation] = useState<WeatherStation | null>(null)
+  const [forecastLocation, setForecastLocation] = useState<ForecastLocation | null>(null)
+  const [forecastIsMapPoint, setForecastIsMapPoint] = useState(false)
   const [mapReady, setMapReady] = useState(false)
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
+  const [mobileDetail, setMobileDetail] = useState<{ selector: string } | null>(null)
+  const panelElement = useRef<HTMLElement>(null)
+  const revealMobileDetails = useCallback((selector: string) => {
+    if (!window.matchMedia('(max-width: 700px)').matches) return
+    setMobilePanelOpen(true)
+    setMobileDetail({ selector })
+  }, [])
+
+  useEffect(() => {
+    if (!mobilePanelOpen || !mobileDetail) return
+    const panel = panelElement.current
+    const detail = panel?.querySelector<HTMLElement>(mobileDetail.selector)
+    if (panel && detail) {
+      panel.scrollTop += detail.getBoundingClientRect().top - panel.getBoundingClientRect().top - 16
+    }
+  }, [mobilePanelOpen, mobileDetail])
+
+  useEffect(() => {
+    if (forecastLocation || selectedStation) revealMobileDetails('.station-card')
+  }, [forecastLocation, selectedStation, revealMobileDetails])
+
+  useEffect(() => {
+    savePreference(MAP_LAYERS_KEY, {
+      opera: operaVisible, satellite: satelliteVisible, stations: stationsVisible,
+      warnings: warningsVisible, satelliteOpacity,
+    })
+  }, [operaVisible, satelliteVisible, stationsVisible, warningsVisible, satelliteOpacity])
+
+  useEffect(() => {
+    const currentMap = map.current
+    if (!mapReady || !currentMap || !forecastLocation) return
+    const marker = new VectorLayer({
+      source: new VectorSource({
+        features: [new Feature(new Point(fromLonLat([forecastLocation.longitude, forecastLocation.latitude])))],
+      }),
+      style: new Style({
+        image: new Circle({
+          radius: 8,
+          fill: new Fill({ color: '#23b4dc' }),
+          stroke: new Stroke({ color: '#fff', width: 3 }),
+        }),
+      }),
+      zIndex: 20,
+    })
+    currentMap.addLayer(marker)
+    return () => { currentMap.removeLayer(marker) }
+  }, [mapReady, forecastLocation])
 
   useEffect(() => {
     if (!mapElement.current) return
@@ -145,13 +174,7 @@ function App() {
       opacity: 0.72,
       visible: false,
     })
-    europeLayer.current = new ImageLayer({
-      opacity: 0.95,
-      visible: false,
-    })
     clipLayerToGermany(radarLayer.current, false)
-    // The EUMETSAT palette is very pale, so boost its colours to stay readable on the map.
-    clipLayerToGermany(europeLayer.current, true, 'saturate(2.6) contrast(1.5) brightness(0.85)')
     const clusterSource = new Cluster({
       distance: 30,
       source: stationSource.current,
@@ -195,24 +218,40 @@ function App() {
 
     map.current = new Map({
       target: mapElement.current,
-      layers: [baseLayer, satelliteLayer.current, createGermanyMaskLayer(), europeLayer.current, radarLayer.current, stationLayer.current],
+      layers: [baseLayer, satelliteLayer.current, radarLayer.current, stationLayer.current],
       view: new View({
-        center: fromLonLat([10.5, 51.5]),
-        zoom: 4.6,
+        center: fromLonLat(initialView.center),
+        zoom: initialView.zoom,
         minZoom: 3.5,
         maxZoom: 12,
       }),
     })
     map.current.on('moveend', () => setRadarViewport((version) => version + 1))
+    const saveView = () => {
+      const view = map.current?.getView()
+      const center = view?.getCenter()
+      const zoom = view?.getZoom()
+      if (!center || zoom === undefined) return
+      const [longitude, latitude] = toLonLat(center)
+      const preference = { center: [((longitude + 180) % 360 + 360) % 360 - 180, latitude], zoom }
+      if (validView(preference)) savePreference(MAP_VIEW_KEY, preference)
+    }
+    map.current.on('moveend', saveView)
     map.current.on('change:size', () => setRadarViewport((version) => version + 1))
     const updateClustering = () => {
       clusterSource.setDistance((map.current?.getView().getZoom() ?? 0) >= 8 ? 0 : 30)
     }
     map.current.getView().on('change:resolution', updateClustering)
     map.current.on('singleclick', (event) => {
-      const feature = map.current?.forEachFeatureAtPixel(event.pixel, (mapFeature) => mapFeature)
+      const feature = map.current?.forEachFeatureAtPixel(event.pixel, (mapFeature) => mapFeature, {
+        layerFilter: (layer) => layer === stationLayer.current,
+      })
       const members = feature?.get('features') as Feature<Point>[] | undefined
+      if (!members && map.current?.forEachFeatureAtPixel(event.pixel,
+        (candidate) => candidate.get('warning') ? true : undefined)) return
       if (members && members.length > 1) {
+        setForecastLocation(null)
+        setForecastIsMapPoint(false)
         const extent = boundingExtent(members.flatMap((member) => {
           const geometry = member.getGeometry()
           return geometry ? [geometry.getCoordinates()] : []
@@ -220,21 +259,52 @@ function App() {
         map.current?.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 10, duration: 300 })
         setSelectedStation(null)
       } else {
-        setSelectedStation((members?.[0].get('station') as WeatherStation | undefined) ?? null)
+        const station = members?.[0].get('station') as WeatherStation | undefined
+        setSelectedStation(station ?? null)
+        if (station) {
+          setForecastLocation(null)
+          setForecastIsMapPoint(false)
+        } else {
+          const [longitude, latitude] = toLonLat(event.coordinate)
+          if (latitude < -90 || latitude > 90) return
+          const wrappedLongitude = ((longitude + 180) % 360 + 360) % 360 - 180
+          setForecastLocation({
+            name: '',
+            latitude,
+            longitude: wrappedLongitude,
+          })
+          setForecastIsMapPoint(true)
+        }
       }
     })
     setMapReady(true)
 
     return () => {
+      saveView()
       map.current?.setTarget(undefined)
       map.current = null
       stationLayer.current = null
       radarLayer.current = null
-      europeLayer.current = null
       satelliteLayer.current = null
       clusterSource.setSource(null)
     }
   }, [])
+
+  useEffect(() => {
+    if (!mapReady || !mapElement.current) return
+    const root = mapElement.current
+    const labels = language === 'de'
+      ? { zoomIn: 'Vergrößern', zoomOut: 'Verkleinern', attribution: 'Quellenangaben' }
+      : { zoomIn: 'Zoom in', zoomOut: 'Zoom out', attribution: 'Attributions' }
+    for (const [selector, label] of [['.ol-zoom-in', labels.zoomIn], ['.ol-zoom-out', labels.zoomOut]] as const) {
+      const button = root.querySelector<HTMLButtonElement>(selector)
+      button?.setAttribute('aria-label', label)
+      button?.setAttribute('title', label)
+    }
+    const attributionButton = root.querySelector<HTMLButtonElement>('.ol-attribution button')
+    attributionButton?.setAttribute('aria-label', labels.attribution)
+    attributionButton?.setAttribute('title', labels.attribution)
+  }, [mapReady, language])
 
   useEffect(() => {
     if (!satelliteVisible) {
@@ -252,7 +322,8 @@ function App() {
         setSatelliteError(null)
       } catch (error: unknown) {
         if (controller.signal.aborted) return
-        setSatelliteError(error instanceof Error ? error.message : 'Unbekannter Fehler')
+        console.error('Failed to load satellite frames:', error)
+        setSatelliteError(error instanceof Error ? error.message : localization.current.t('Unbekannter Fehler', 'Unknown error'))
       }
     }
     void refresh()
@@ -301,8 +372,12 @@ function App() {
       setSatelliteImageLoading(false)
     }).catch((error: unknown) => {
       if (!active) return
+      console.error('Failed to load satellite image:', error)
       setSatelliteImageLoading(false)
-      setSatelliteImageError(error instanceof Error ? error.message : 'Satellitenbild konnte nicht geladen werden.')
+      setSatelliteImageError(error instanceof Error ? error.message : localization.current.t(
+        'Satellitenbild konnte nicht geladen werden.',
+        'Could not load satellite image.',
+      ))
       setSatellitePlaying(false)
     })
 
@@ -353,11 +428,6 @@ function App() {
     let isCurrent = true
     const refreshFrames = async () => {
       setRadarFramesLoading(true)
-      getEuropePrecipitationFrames(controller.signal).then((data) => {
-        if (isCurrent) setEuropeFrames(data.frames)
-      }).catch((error: unknown) => {
-        if (isCurrent && !controller.signal.aborted) console.warn('Europa-Niederschlag nicht verfügbar:', error)
-      })
       try {
         const data = await getRadarFrames(controller.signal)
         if (!isCurrent) return
@@ -366,7 +436,8 @@ function App() {
         setRadarError(null)
       } catch (error: unknown) {
         if (!isCurrent || controller.signal.aborted) return
-        setRadarError(error instanceof Error ? error.message : 'Unbekannter Fehler')
+        console.error('Failed to load radar frames:', error)
+        setRadarError(error instanceof Error ? error.message : localization.current.t('Unbekannter Fehler', 'Unknown error'))
       } finally {
         if (isCurrent) setRadarFramesLoading(false)
       }
@@ -393,54 +464,12 @@ function App() {
       window.devicePixelRatio || 1, view.getProjection(),
     )
     radarBuffer.current = buffer
-    // The EUMETSAT image changes only every 15 minutes and is soft, so one pixel per screen pixel is enough.
-    const europe = createRadarBuffer(
-      EUMETSAT_WMS_URL, EUROPE_PRECIPITATION_LAYER, view.calculateExtent(size), resolution,
-      1, view.getProjection(),
-    )
-    europeBuffer.current = europe
     return () => {
       buffer.dispose()
-      europe.dispose()
       radarBuffer.current = null
-      europeBuffer.current = null
     }
   }, [radarVisible, radarViewport, radarReload])
 
-  const selectedRadarFrame = radarFrames[radarFrameIndex]
-
-  useEffect(() => {
-    const layer = europeLayer.current
-    const buffer = europeBuffer.current
-    const slot = selectedRadarFrame ? europeSlot(selectedRadarFrame, europeFrames) : null
-    if (!radarVisible || !slot || !buffer || !layer) return
-    buffer.retain(europeFrames)
-    let active = true
-    void buffer.load(slot, true).then((source) => {
-      if (!active) return
-      layer.setSource(source)
-      layer.setVisible(true)
-    }).catch((error: unknown) => {
-      if (active && !(error instanceof DOMException && error.name === 'AbortError')) {
-        console.warn('Europa-Niederschlag konnte nicht geladen werden:', error)
-      }
-    })
-
-    // Prefetch all slots of the timeline in playback order.
-    const upcoming = radarFrames.map((_, offset) =>
-      europeSlot(radarFrames[(radarFrameIndex + 1 + offset) % radarFrames.length], europeFrames))
-    for (const next of new Set(upcoming)) {
-      if (next && next !== slot) void buffer.load(next).catch(() => undefined)
-    }
-
-    return () => {
-      active = false
-    }
-  }, [radarFrames, radarFrameIndex, selectedRadarFrame, europeFrames, radarVisible, radarViewport, radarReload])
-
-  useEffect(() => {
-    if (!radarVisible) europeLayer.current?.setVisible(false)
-  }, [radarVisible])
 
   useEffect(() => {
     const selectedFrame = radarFrames[radarFrameIndex]
@@ -458,8 +487,12 @@ function App() {
         setRadarImageLoading(false)
     }).catch((error: unknown) => {
       if (!active) return
+      console.error('Failed to load radar image:', error)
       setRadarImageLoading(false)
-      setRadarImageError(error instanceof Error ? error.message : 'Radarbild konnte nicht geladen werden.')
+      setRadarImageError(error instanceof Error ? error.message : localization.current.t(
+        'Radarbild konnte nicht geladen werden.',
+        'Could not load radar image.',
+      ))
       setRadarPlaying(false)
     })
 
@@ -510,11 +543,12 @@ function App() {
           : null)
         setStationError(null)
         setStationWarning(data.unavailable.length > 0
-          ? `${data.unavailable.length} von ${data.total} Stationen momentan nicht verfügbar.`
+          ? { unavailable: data.unavailable.length, total: data.total }
           : null)
       } catch (error: unknown) {
         if (controller.signal.aborted) return
-        setStationError(error instanceof Error ? error.message : 'Unbekannter Fehler')
+        console.error('Failed to load weather stations:', error)
+        setStationError(error instanceof Error ? error.message : localization.current.t('Unbekannter Fehler', 'Unknown error'))
       }
     }
     void refresh()
@@ -543,43 +577,94 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Wetterkarte Deutschland</p>
-          <h1>Wetter live im Überblick</h1>
+          <p className="eyebrow">{t('Wetterkarte Deutschland & Europa', 'Germany & Europe Weather Map')}</p>
+          <h1>{t('Wetter live im Überblick', 'Live weather at a glance')}</h1>
         </div>
-        <span className={`status ${mapReady ? 'status-ready' : ''}`}>
-          <span className="status-dot" />
-          {mapReady ? 'Karte bereit' : 'Karte wird geladen'}
-        </span>
+        <div className="topbar-actions">
+          <div className="language-switch" role="group" aria-label={t('Sprache auswählen', 'Select language')}>
+            <button
+              aria-pressed={language === 'de'}
+              onClick={() => setLanguage('de')}
+              type="button"
+            >
+              Deutsch
+            </button>
+            <button
+              aria-pressed={language === 'en'}
+              onClick={() => setLanguage('en')}
+              type="button"
+            >
+              English
+            </button>
+          </div>
+          <span className={`status ${mapReady ? 'status-ready' : ''}`}>
+            <span className="status-dot" />
+            {mapReady ? t('Karte bereit', 'Map ready') : t('Karte wird geladen', 'Loading map')}
+          </span>
+        </div>
       </header>
 
-      <section className="content">
-        <aside className="control-panel">
+      <section className={`content${mobilePanelOpen ? ' mobile-panel-open' : ''}`}>
+        <div className="mobile-map-toolbar">
+          <button type="button" aria-controls="weather-controls" aria-expanded={mobilePanelOpen}
+            onClick={() => setMobilePanelOpen((open) => !open)}>
+            {mobilePanelOpen ? t('Bedienfeld schließen', 'Close controls') : t('Suche & Layer', 'Search & layers')}
+          </button>
+        </div>
+        <aside className="control-panel" id="weather-controls" ref={panelElement}
+          aria-label={t('Suche, Layer und Wetterdetails', 'Search, layers and weather details')}>
           <div>
-            <p className="panel-kicker">V1-Prototyp</p>
-            <h2>Layer</h2>
+            <p className="panel-kicker">{t('V1-Prototyp', 'V1 prototype')}</p>
+            <h2>{t('Layer', 'Layers')}</h2>
           </div>
-          <div className="layer-group">
-            <p className="layer-group-title">Aktive Wetterdaten</p>
+          <LocationSearch onSelect={(place) => {
+            setSelectedStation(null)
+            setForecastLocation(place)
+            setForecastIsMapPoint(false)
+            map.current?.getView().animate({ center: fromLonLat([place.longitude, place.latitude]), zoom: 9, duration: 500 })
+          }} />
+          <button type="button" className="reload-button" onClick={() => {
+            map.current?.getView().animate({
+              center: fromLonLat(DEFAULT_VIEW.center), zoom: DEFAULT_VIEW.zoom, duration: 300,
+            })
+          }}>{t('Kartenansicht zurücksetzen', 'Reset map view')}</button>
+          <OperaRadar
+            map={mapReady ? map.current : null}
+            active={operaVisible}
+            onChange={(active) => {
+              setOperaVisible(active)
+              if (active) {
+                setRadarVisible(false)
+              }
+            }}
+          />
+          {DWD_RADAR_FALLBACK_ENABLED && <div className="layer-group">
+            <p className="layer-group-title">{t('Aktive Wetterdaten', 'Live weather data')}</p>
             <label className="layer-toggle">
               <input
                 checked={radarVisible}
-                onChange={(event) => setRadarVisible(event.target.checked)}
+                onChange={(event) => {
+                  setRadarVisible(event.target.checked)
+                  if (event.target.checked) {
+                    setOperaVisible(false)
+                  }
+                }}
                 type="checkbox"
               />
               <span className="toggle-track" />
               <span>
-                <strong>Niederschlagsradar</strong>
-                <small>DWD-Radar in Deutschland · EUMETSAT-Niederschlag in Europa</small>
+                <strong>{t('Niederschlagsradar (Deutschland)', 'Precipitation radar (Germany)')}</strong>
+                <small>{t('DWD-Radarmessungen · alle 5 Minuten', 'DWD radar measurements · every 5 minutes')}</small>
               </span>
             </label>
             {radarVisible && (
               <>
                 <div className="radar-timeline">
                   <div className="radar-time-heading">
-                    <span>Beobachtung</span>
+                    <span>{t('Beobachtung', 'Observation')}</span>
                     {displayedRadarTime ? (
                       <time dateTime={displayedRadarTime}>
-                        {new Intl.DateTimeFormat('de-DE', {
+                        {new Intl.DateTimeFormat(locale, {
                           hour: '2-digit',
                           minute: '2-digit',
                           timeZone: 'Europe/Berlin',
@@ -587,13 +672,13 @@ function App() {
                         }).format(new Date(displayedRadarTime))}
                       </time>
                     ) : (
-                      <span>{radarFramesLoading ? 'Lade …' : 'Nicht verfügbar'}</span>
+                      <span>{radarFramesLoading ? t('Lade …', 'Loading …') : t('Nicht verfügbar', 'Unavailable')}</span>
                     )}
                   </div>
                   {radarFrames.length > 0 && (
                     <>
                       <input
-                        aria-label="Radarzeitpunkt auswählen"
+                        aria-label={t('Radarzeitpunkt auswählen', 'Select radar time')}
                         className="radar-slider"
                         max={radarFrames.length - 1}
                         min={0}
@@ -606,7 +691,7 @@ function App() {
                       />
                       <div className="radar-controls">
                         <button
-                          aria-label="Fünf Minuten zurück"
+                          aria-label={t('Fünf Minuten zurück', 'Back five minutes')}
                           disabled={radarFrameIndex === 0}
                           onClick={() => {
                             setRadarPlaying(false)
@@ -627,10 +712,10 @@ function App() {
                           }}
                           type="button"
                         >
-                          {radarPlaying ? 'Pause' : 'Abspielen'}
+                          {radarPlaying ? t('Pause', 'Pause') : t('Abspielen', 'Play')}
                         </button>
                         <button
-                          aria-label="Fünf Minuten vor"
+                          aria-label={t('Fünf Minuten vor', 'Forward five minutes')}
                           disabled={radarFrameIndex === radarFrames.length - 1}
                           onClick={() => {
                             setRadarPlaying(false)
@@ -648,54 +733,53 @@ function App() {
                           }}
                           type="button"
                         >
-                          Jetzt
+                          {t('Jetzt', 'Now')}
                         </button>
                       </div>
                     </>
                   )}
-                  {radarError && <p className="layer-error">{radarError}</p>}
-                  {radarImageError && <p className="layer-error" role="alert">{radarImageError}</p>}
+                  {radarError && <p className="layer-error">{t('Radarzeitpunkte konnten nicht geladen werden.', 'Could not load radar timestamps.')}</p>}
+                  {radarImageError && <p className="layer-error" role="alert">{t('Radarbild konnte nicht geladen werden.', 'Could not load radar image.')}</p>}
                   <button
                     className="reload-button"
                     disabled={radarFramesLoading}
                     onClick={() => setRadarReload((count) => count + 1)}
                     type="button"
                   >
-                    ↻ Radar neu laden
+                    ↻ {t('Radar neu laden', 'Reload radar')}
                   </button>
                   <p
                     className={`radar-range-note radar-loading-status${radarImageLoading ? '' : ' radar-loading-status-idle'}`}
                     role="status"
                   >
-                    Nächstes Radarbild wird vorgeladen …
+                    {t('Nächstes Radarbild wird vorgeladen …', 'Prefetching next radar image …')}
                   </p>
                   <small className="radar-range-note">
                     {radarFrames.length > 0
-                      ? `${radarFrames.length - 1} Schritte à 5 Minuten · letzte beobachtete Stunde`
-                      : radarError ? 'Keine Radarzeitpunkte verfügbar' : 'DWD-Radarzeitpunkte werden geladen'}
+                      ? `${new Intl.NumberFormat(locale).format(radarFrames.length - 1)} ${t('Schritte à 5 Minuten · letzte beobachtete Stunde', 'steps at 5-minute intervals · latest observed hour')}`
+                      : radarError ? t('Keine Radarzeitpunkte verfügbar', 'No radar timestamps available') : t('DWD-Radarzeitpunkte werden geladen', 'Loading DWD radar timestamps')}
                   </small>
                 </div>
                 <details className="radar-legend">
-                  <summary>Farblegende anzeigen</summary>
+                  <summary>{t('Farblegende anzeigen', 'Show color legend')}</summary>
                   <div className="radar-legend-content">
                     <img
-                      alt="DWD-Legende der Niederschlagsrate in Millimetern pro Stunde"
+                      alt={t('DWD-Legende der Niederschlagsrate in Millimetern pro Stunde', 'DWD legend of precipitation rate in millimeters per hour')}
                       src={RADAR_LEGEND_URL}
                     />
                     <p>
-                      Die Flächenfarben zeigen die Niederschlagsrate in mm/h
-                      (DWD-Radar, nur Deutschland). Außerhalb Deutschlands
-                      zeigt die Karte einen aus Satellitendaten abgeleiteten
-                      Niederschlag von EUMETSAT. Er ist gröber, ungenauer und
-                      wird nur alle 15 Minuten aktualisiert.
+                      {t(
+                        'Die Flächenfarben zeigen die Niederschlagsrate in mm/h (DWD-Radar, nur Deutschland). Außerhalb Deutschlands werden in dieser Ansicht keine Niederschlagsdaten gezeigt.',
+                        'Area colors show precipitation rate in mm/h (DWD radar, Germany only). No precipitation data is shown outside Germany in this view.',
+                      )}
                     </p>
                   </div>
                 </details>
               </>
             )}
-          </div>
+          </div>}
           <div className="layer-group">
-            <p className="layer-group-title">Wolken</p>
+            <p className="layer-group-title">{t('Wolken', 'Clouds')}</p>
             <label className="layer-toggle">
               <input
                 checked={satelliteVisible}
@@ -704,17 +788,17 @@ function App() {
               />
               <span className="toggle-track" />
               <span>
-                <strong>Satellit Infrarot</strong>
-                <small>EUMETSAT Meteosat · alle 15 Minuten</small>
+                <strong>{t('Satellit Infrarot', 'Infrared satellite')}</strong>
+                <small>{t('EUMETSAT Meteosat · alle 15 Minuten', 'EUMETSAT Meteosat · every 15 minutes')}</small>
               </span>
             </label>
             {satelliteVisible && (
               <div className="radar-timeline">
                 <div className="radar-time-heading">
-                  <span>Aufnahme</span>
+                  <span>{t('Aufnahme', 'Image')}</span>
                   {satelliteTime ? (
                     <time dateTime={satelliteTime}>
-                      {new Intl.DateTimeFormat('de-DE', {
+                      {new Intl.DateTimeFormat(locale, {
                         hour: '2-digit',
                         minute: '2-digit',
                         timeZone: 'Europe/Berlin',
@@ -722,13 +806,13 @@ function App() {
                       }).format(new Date(satelliteTime))}
                     </time>
                   ) : (
-                    <span>{satelliteError ? 'Nicht verfügbar' : 'Lade …'}</span>
+                    <span>{satelliteError ? t('Nicht verfügbar', 'Unavailable') : t('Lade …', 'Loading …')}</span>
                   )}
                 </div>
                 {satelliteFrames.length > 0 && (
                   <>
                     <input
-                      aria-label="Satellitenzeitpunkt auswählen"
+                      aria-label={t('Satellitenzeitpunkt auswählen', 'Select satellite time')}
                       className="radar-slider"
                       max={satelliteFrames.length - 1}
                       min={0}
@@ -741,7 +825,7 @@ function App() {
                     />
                     <div className="radar-controls">
                       <button
-                        aria-label="Eine Aufnahme zurück"
+                        aria-label={t('Eine Aufnahme zurück', 'Previous image')}
                         disabled={satelliteFrameIndex === 0}
                         onClick={() => {
                           setSatellitePlaying(false)
@@ -762,10 +846,10 @@ function App() {
                         }}
                         type="button"
                       >
-                        {satellitePlaying ? 'Pause' : 'Abspielen'}
+                        {satellitePlaying ? t('Pause', 'Pause') : t('Abspielen', 'Play')}
                       </button>
                       <button
-                        aria-label="Eine Aufnahme vor"
+                        aria-label={t('Eine Aufnahme vor', 'Next image')}
                         disabled={satelliteFrameIndex === satelliteFrames.length - 1}
                         onClick={() => {
                           setSatellitePlaying(false)
@@ -783,15 +867,15 @@ function App() {
                         }}
                         type="button"
                       >
-                        Jetzt
+                        {t('Jetzt', 'Now')}
                       </button>
                     </div>
                   </>
                 )}
                 <label className="satellite-opacity">
-                  <span>Deckkraft</span>
+                  <span>{t('Deckkraft', 'Opacity')}</span>
                   <input
-                    aria-label="Deckkraft der Satellitenwolken"
+                    aria-label={t('Deckkraft der Satellitenwolken', 'Satellite cloud opacity')}
                     max={1}
                     min={0.2}
                     onChange={(event) => setSatelliteOpacity(Number(event.target.value))}
@@ -800,43 +884,68 @@ function App() {
                     value={satelliteOpacity}
                   />
                 </label>
-                {satelliteError && <p className="layer-error">{satelliteError}</p>}
-                {satelliteImageError && <p className="layer-error" role="alert">{satelliteImageError}</p>}
+                {satelliteError && <p className="layer-error">{t('Satellitendaten konnten nicht geladen werden.', 'Could not load satellite data.')}</p>}
+                {satelliteImageError && <p className="layer-error" role="alert">{t('Satellitenbild konnte nicht geladen werden.', 'Could not load satellite image.')}</p>}
                 <button
                   className="reload-button"
                   onClick={() => setSatelliteReload((count) => count + 1)}
                   type="button"
                 >
-                  ↻ Satellit neu laden
+                  ↻ {t('Satellit neu laden', 'Reload satellite')}
                 </button>
                 <p
                   className={`radar-range-note radar-loading-status${satelliteImageLoading ? '' : ' radar-loading-status-idle'}`}
                   role="status"
                 >
-                  Satellitenbild wird geladen …
+                  {t('Satellitenbild wird geladen …', 'Loading satellite image …')}
                 </p>
                 <small className="radar-range-note">
-                  Helle Bereiche sind kalte, hohe Wolken; dunkle Flächen sind
-                  Boden oder niedrige Wolken. Die Bilder sind etwa eine Stunde alt.
+                  {t(
+                    'Helle Bereiche sind kalte, hohe Wolken; dunkle Flächen sind Boden oder niedrige Wolken. Die Bilder sind etwa eine Stunde alt.',
+                    'Bright areas are cold, high clouds; dark areas are ground or low clouds. The images are about an hour old.',
+                  )}
                 </small>
               </div>
             )}
           </div>
+          {forecastLocation && (
+            <section className="station-card" aria-label={t('Ortsvorhersage', 'Location forecast')}>
+              <button aria-label={t('Ortsvorhersage schließen', 'Close location forecast')} className="station-card-close"
+                onClick={() => {
+                  setForecastLocation(null)
+                  setForecastIsMapPoint(false)
+                }} type="button">×</button>
+              <p className="panel-kicker">{t('Ortsvorhersage', 'Location forecast')}</p>
+              <h3>
+                {forecastIsMapPoint
+                  ? `${t('Kartenpunkt', 'Map point')} ${new Intl.NumberFormat(locale, {
+                    minimumFractionDigits: 3,
+                    maximumFractionDigits: 3,
+                  }).format(forecastLocation.latitude)}°, ${new Intl.NumberFormat(locale, {
+                    minimumFractionDigits: 3,
+                    maximumFractionDigits: 3,
+                  }).format(forecastLocation.longitude)}°`
+                  : forecastLocation.name}
+              </h3>
+              <StationForecast key={`${forecastLocation.latitude},${forecastLocation.longitude}`}
+                latitude={forecastLocation.latitude} longitude={forecastLocation.longitude} />
+            </section>
+          )}
           {selectedStation && (
             <section className="station-card" aria-live="polite">
               <button
-                aria-label="Stationsdetails schließen"
+                aria-label={t('Stationsdetails schließen', 'Close station details')}
                 className="station-card-close"
                 onClick={() => setSelectedStation(null)}
                 type="button"
               >
                 ×
               </button>
-              <p className="panel-kicker">DWD-Wetterstation</p>
+              <p className="panel-kicker">{t('DWD-Wetterstation', 'DWD weather station')}</p>
               <h3>{selectedStation.name}</h3>
-              <p className="observed-label">Letzte Messung</p>
+              <p className="observed-label">{t('Letzte Messung', 'Latest observation')}</p>
               <time className="observed-at" dateTime={selectedStation.observedAt}>
-                {new Intl.DateTimeFormat('de-DE', {
+                {new Intl.DateTimeFormat(locale, {
                   day: '2-digit',
                   month: '2-digit',
                   year: 'numeric',
@@ -847,9 +956,9 @@ function App() {
                 }).format(new Date(selectedStation.observedAt))}
               </time>
               <dl>
-                <div><dt>Temperatur</dt><dd>{selectedStation.temperature === null ? '–' : `${selectedStation.temperature.toFixed(1)} °C`}</dd></div>
-                <div><dt>Feuchte</dt><dd>{selectedStation.humidity === null ? '–' : `${selectedStation.humidity} %`}</dd></div>
-                <div><dt>Wind</dt><dd>{selectedStation.windSpeed === null ? '–' : `${selectedStation.windSpeed} km/h`}</dd></div>
+                <div><dt>{t('Temperatur', 'Temperature')}</dt><dd>{selectedStation.temperature === null ? '–' : `${new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(selectedStation.temperature)} °C`}</dd></div>
+                <div><dt>{t('Feuchte', 'Humidity')}</dt><dd>{selectedStation.humidity === null ? '–' : `${new Intl.NumberFormat(locale).format(selectedStation.humidity)} %`}</dd></div>
+                <div><dt>{t('Wind', 'Wind')}</dt><dd>{selectedStation.windSpeed === null ? '–' : `${new Intl.NumberFormat(locale).format(selectedStation.windSpeed)} km/h`}</dd></div>
               </dl>
               <StationForecast
                 latitude={selectedStation.latitude}
@@ -858,7 +967,7 @@ function App() {
             </section>
           )}
           <div className="layer-group">
-            <p className="layer-group-title">Messwerte</p>
+            <p className="layer-group-title">{t('Messwerte', 'Observations')}</p>
             <label className="layer-toggle">
               <input
                 checked={stationsVisible}
@@ -867,52 +976,63 @@ function App() {
               />
               <span className="toggle-track" />
               <span>
-                <strong>Wetterstationen</strong>
+                <strong>{t('Wetterstationen', 'Weather stations')}</strong>
                 <small>
                   {stationError
-                    ? 'Daten momentan nicht verfügbar'
+                    ? t('Daten momentan nicht verfügbar', 'Data currently unavailable')
                     : stationsVisible && stations.length === 0
-                      ? 'DWD-Daten werden geladen'
+                      ? t('DWD-Daten werden geladen', 'Loading DWD data')
                       : stations.length > 0
-                        ? `${stations.length} Stationen aktiv · Deutschland`
-                        : 'DWD-Netz · Deutschland'}
+                        ? `${new Intl.NumberFormat(locale).format(stations.length)} ${t('Stationen aktiv · Deutschland', 'stations active · Germany')}`
+                        : t('DWD-Netz · Deutschland', 'DWD network · Germany')}
                 </small>
               </span>
             </label>
-            {stationError && <p className="layer-error">{stationError}</p>}
-            {stationWarning && <p className="layer-error">{stationWarning}</p>}
+            {stationError && <p className="layer-error">{t('Wetterstationsdaten konnten nicht geladen werden.', 'Could not load weather station data.')}</p>}
+            {stationWarning && (
+              <p className="layer-error">
+                {new Intl.NumberFormat(locale).format(stationWarning.unavailable)} {t('von', 'of')}{' '}
+                {new Intl.NumberFormat(locale).format(stationWarning.total)}{' '}
+                {t('Stationen momentan nicht verfügbar.', 'stations currently unavailable.')}
+              </p>
+            )}
             <p className="station-help">
-              Gelbe, gestrichelte Kreise fassen mehrere Stationen zusammen und
-              zeigen deren Durchschnittstemperatur (Ø).
-              Anklicken oder hineinzoomen zeigt die einzelnen Messpunkte.
-              Daten werden alle fünf Minuten nachgeladen.
+              {t(
+                'Gelbe, gestrichelte Kreise fassen mehrere Stationen zusammen und zeigen deren Durchschnittstemperatur (Ø). Anklicken oder hineinzoomen zeigt die einzelnen Messpunkte. Daten werden alle fünf Minuten nachgeladen.',
+                'Yellow, dashed circles group multiple stations and show their average temperature (Ø). Click or zoom in to see individual readings. Data is refreshed every five minutes.',
+              )}
             </p>
           </div>
+          <WeatherWarnings map={mapReady ? map.current : null} visible={warningsVisible} onChange={setWarningsVisible}
+            onDetails={() => revealMobileDetails('.warning-card')} />
           <div className="layer-group layer-group-muted">
-            <p className="layer-group-title">In Vorbereitung</p>
+            <p className="layer-group-title">{t('In Vorbereitung', 'Coming soon')}</p>
             <div className="layer-placeholder">
               <span className="placeholder-icon">↗</span>
               <span>
-                <strong>Hoch- und Tiefdruck</strong>
-                <small>Großwetterlage · später</small>
+                <strong>{t('Hoch- und Tiefdruck', 'High and low pressure')}</strong>
+                <small>{t('Großwetterlage · später', 'Synoptic situation · planned')}</small>
               </span>
               <span className="planned-badge">V1.1</span>
             </div>
           </div>
           <div className="info-box">
-            <strong>Hinweis</strong>
+            <strong>{t('Hinweis', 'Note')}</strong>
             <p>
-              Die Basiskarte zeigt Europa als räumlichen Kontext. Der Radar-Layer
-              zeigt in Deutschland das DWD-Radarkomposit, außerhalb
-              abgeleiteten Satelliten-Niederschlag. Farbige Bereiche sind
-              Niederschlag, nicht Wolken.
+              {t(
+                'OPERA zeigt einen gemeinsamen europäischen Radarverbund. Die Farbskala gilt einheitlich für Deutschland und Europa. Satellit Infrarot zeigt Wolken, nicht die Regenintensität.',
+                'OPERA shows a shared European radar network. The color scale is consistent across Germany and Europe. Infrared satellite imagery shows clouds, not rainfall intensity.',
+              )}
             </p>
           </div>
         </aside>
-        <div ref={mapElement} className="map" aria-label="Deutschlandkarte mit DWD-Radar" />
+        <div ref={mapElement} className="map" aria-label={t('Wetterkarte Europa', 'Europe weather map')} />
       </section>
       <footer>
-        Datenquelle: Deutscher Wetterdienst · Kartenbasis: OpenStreetMap
+        {t(
+          'Datenquellen: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Kartenbasis: OpenStreetMap',
+          'Data sources: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Map base: OpenStreetMap',
+        )}
       </footer>
     </main>
   )

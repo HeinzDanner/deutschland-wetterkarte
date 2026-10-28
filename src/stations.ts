@@ -22,8 +22,9 @@ export type RadarFramesResponse = {
 }
 
 export type Forecast = {
+  timezone: string
   hourly: {
-    time: string[]
+    time: number[]
     temperature_2m: (number | null)[]
     precipitation_probability: (number | null)[]
     precipitation: (number | null)[]
@@ -31,7 +32,7 @@ export type Forecast = {
     wind_speed_10m: (number | null)[]
   }
   daily: {
-    time: string[]
+    time: number[]
     weather_code: (number | null)[]
     temperature_2m_max: (number | null)[]
     temperature_2m_min: (number | null)[]
@@ -54,15 +55,6 @@ export async function getSatelliteFrames(signal: AbortSignal): Promise<RadarFram
   const response = await fetch('/api/satellite/times', { signal })
   if (!response.ok) {
     throw new Error('Satellitenzeitpunkte konnten nicht geladen werden.')
-  }
-
-  return await response.json() as RadarFramesResponse
-}
-
-export async function getEuropePrecipitationFrames(signal: AbortSignal): Promise<RadarFramesResponse> {
-  const response = await fetch('/api/precipitation-europe/times', { signal })
-  if (!response.ok) {
-    throw new Error('Europa-Niederschlagszeitpunkte konnten nicht geladen werden.')
   }
 
   return await response.json() as RadarFramesResponse

@@ -4176,4 +4176,179 @@ Arbeitspaketplan entstehen:
 
 ## Satellit
 
+## Ortssuche und Kartenpunkt-Vorhersage
+
+### Handy-Ansicht
+
+Bis 700 px Breite bleibt die Karte im sichtbaren Bildschirmbereich.
+„Suche & Layer“ öffnet darunter ein separat scrollbares Bedienfeld, das
+sich wieder schließen lässt. In schmalem Querformat mit geringer Höhe
+stehen Karte und geöffnetes Bedienfeld nebeneinander. Kartenpunkt- und
+Stationsvorhersagen sowie angeklickte Warnungen öffnen das Bedienfeld
+automatisch und bringen die Details in dessen sichtbaren Bereich.
+Bedienelemente besitzen größere Touch-Flächen; Desktop-Seitenleiste und
+gespeicherte Einstellungen bleiben unverändert. Dies ist eine responsive
+Webansicht, noch keine installierbare PWA oder Offline-App.
+
+### Letzte Kartenansicht
+
+Kartenzentrum und Zoom werden nach abgeschlossenen Kartenbewegungen lokal im
+Browser gespeichert (`weather-map-view`). Sichtbarkeit von Europa-Radar,
+Satellit, Stationen und DWD-Warnungen sowie die Satelliten-Deckkraft werden
+unter `weather-map-layers` gespeichert. Nach erneutem Öffnen gelten diese
+Einstellungen; ohne gespeicherte Einstellungen bleiben die bisherigen
+Standardwerte erhalten (Europa-Radar und Warnungen an).
+„Kartenansicht zurücksetzen“ stellt nur den ursprünglichen Kartenausschnitt
+wieder her, ohne Layer oder Sprache zu ändern. Bildzeitpunkte, Wiedergabe,
+Suchverlauf und geöffnete Vorhersagen werden nicht gespeichert; die
+Wiedergabe startet nicht automatisch. Ungültige gespeicherte Daten werden
+mit einem Konsolenhinweis durch die Standardwerte ersetzt. Bei gesperrtem
+Browserspeicher funktioniert die Karte ohne Persistenz weiter.
+
+### Interne Stations-Ausfallhistorie
+
+Bei jedem tatsächlichen Stationsabruf speichert der BFF Ausfälle lokal in
+`data/station-outages.json` (nicht versioniert und nicht per API veröffentlicht).
+Pro Station und Ausfallphase werden der erste und letzte beobachtete Ausfall,
+der erste und letzte Fehlergrund, die Anzahl fehlgeschlagener Abrufe und der
+erste erfolgreiche Abruf danach gespeichert. Wiederholte Ausfälle nach einer
+Erholung bilden einen neuen Eintrag. Die Datei überlebt API-Neustarts.
+Zeitpunkte sind UTC und bezeichnen Beobachtungen unserer App, nicht den
+exakten Beginn oder das Ende einer DWD-Störung. Erfasst wird nur bei
+Stationsabrufen, normalerweise alle fünf Minuten bei aktivem Stationslayer;
+zwischen Abrufen oder bei ausgeschalteter App besteht keine Überwachung.
+Schreib-/Lesefehler erscheinen im Backend-Log, ohne Messwerte zu unterdrücken.
+
+### Amtliche Wetterwarnungen
+
+Der standardmäßig aktive, separat abschaltbare Layer „DWD-Warnungen (Deutschland)“
+steht unter den Wetterstationen und lädt Warngebiete
+über `/api/warnings` aus dem offiziellen WFS `dwd:Warnungen_Gemeinden`.
+Die Geometrien werden als GeoJSON in EPSG:4326 angefragt und für die Karte
+nach EPSG:3857 projiziert. Der BFF cached eine Minute, teilt gleichzeitige
+Anfragen und liest bei Bedarf mehrere WFS-Seiten; die Oberfläche aktualisiert
+alle fünf Minuten. Bei deaktiviertem Layer erfolgen keine Warnungsanfragen.
+
+Öffentliche, reale Warnungen in deutscher Sprache werden übernommen;
+Testmeldungen, aufgehobene und abgelaufene Warnungen werden ausgeschlossen.
+Bevorstehende Warnungen sind sichtbar und als solche in den Details zeitlich
+gekennzeichnet. Ablaufzeiten werden auch zwischen zwei Abrufen berücksichtigt.
+Die CAP-Schweregrade Minor, Moderate, Severe und Extreme werden als Stufen 1–4
+gelb, orange, rot und violett dargestellt; unbekannte Schweregrade bleiben
+unbekannt und erhalten eine graue Darstellung.
+
+Ein Klick auf ein Warngebiet zeigt alle dort getroffenen Warnmeldungen mit
+Stufe, Gebiet, Gültigkeit sowie unverändertem DWD-Titel, Beschreibung und
+Handlungshinweisen. Stationsklicks haben Vorrang; ein Warngebietsklick öffnet
+nicht zusätzlich eine Kartenpunktvorhersage. Die Bedienung ist zweisprachig,
+amtliche Texte bleiben Deutsch. Höhenbeschränkungen im Originaltext beachten.
+Warnungsdetails verlinken auf die offizielle DWD-Seite.
+
+Ladefehler werden ausdrücklich angezeigt und betroffene Warnflächen entfernt;
+ein Ausfall bedeutet nicht Warnfreiheit. Eine erfolgreich gelieferte leere
+Liste hat einen eigenen Hinweis. Das ist eine ergänzende Kartenansicht, kein
+Ersatz für amtliche Warnkanäle oder ein Benachrichtigungsdienst.
+Gezielte Prüfungen: `node --test warnings.test.mjs opera.test.mjs`.
+
+### Sprache
+
+Die Kopfzeile bietet Deutsch / English. Die Auswahl wird lokal unter
+`weather-map-language` gespeichert; ohne gespeicherte Auswahl startet die App
+auf Deutsch. Texte, Bedienhilfen sowie Zahlen- und Datumsformate wechseln
+gemeinsam, ohne die Karte neu aufzubauen. Die Vorhersage-Zeitzone bleibt
+unabhängig von der Oberflächensprache erhalten. Ortsnamen und Quellenbezeichnungen
+bleiben in ihrer ursprünglichen Form. Die Einstellung gilt für diesen Browser.
+`src/i18n.tsx` stellt den gemeinsamen Sprachkontext bereit.
+
+Die Vorhersage zeigt stündliche Windgeschwindigkeiten sowie tägliche
+Windmaxima in km/h. Ein kompaktes Diagramm kombiniert Temperatur (orange,
+linke Achse, °C) und stündlichen Niederschlag (blau, rechte Achse, mm).
+Fehlende Messgrößen erscheinen als „–“, nicht als 0; im Diagramm bleiben
+Lücken ausgespart. Bei Ladefehlern oder nach 20 Sekunden ohne Antwort gibt es
+einen Wiederholen-Knopf. Die API fordert Unixzeitpunkte an, die der Browser
+explizit in der gelieferten Zeitzone darstellt; die Gerätezeitzone verändert
+die Vorhersagezeiten nicht.
+
+Die Suche nach Ortsnamen oder Postleitzahlen nutzt über
+`/api/locations/search?q=...` den Open-Meteo-Geocoding-Dienst (GeoNames);
+fünfstellige deutsche Postleitzahlen werden über Zippopotam.us aufgelöst.
+Ortsnamen werden nur in Deutschland, Österreich und der Schweiz gesucht
+(je eine länderbeschränkte Anfrage); Kartenklicks und Europa-Radar bleiben
+geografisch unverändert.
+Treffer werden mit Region und Land zur Auswahl angeboten. Bei Auswahl
+zentriert sich die Karte auf den Ort; ein blauer Marker kennzeichnet den
+Vorhersagepunkt. Alternativ öffnet ein Klick auf die freie Karte dieselbe
+24-Stunden-/7-Tage-Vorhersage für die angeklickten Koordinaten.
+Ohne zusätzliche Rückwärtssuche wird der Kartenpunkt mit Koordinaten bezeichnet.
+Vorhersagen verwenden weiterhin die bestehende Open-Meteo-DWD-ICON-Anbindung;
+deren Modellabdeckung begrenzt die Verfügbarkeit, Fehler werden angezeigt.
+Stationsklicks und Cluster-Zoom bleiben erhalten. Ortsvorhersagen sind unabhängig
+vom Stationsschalter; Schließen entfernt auch den Marker.
+
+### Niederschlagsansichten
+
+Standard ist jetzt **Europa-Radar (EUMETNET OPERA NIMBUS RATE)**: ein gemeinsames
+Radarkomposit inklusive Deutschlands, mit einheitlichen Farben in mm/h,
+2-km-Raster und verfügbaren 15-Minuten-Zeitpunkten. Bis zu 13 Bilder der letzten
+vier Stunden werden angeboten; fehlende Bilder werden nicht erfunden.
+Bildzeitpunkt, Wiedergabe, Vorladen und Neuladen sind integriert.
+Die Bilddarstellung nutzt lineare Interpolation, damit beim Hineinzoomen
+weichere Übergänge statt harter Pixelkanten entstehen. Es werden nur die
+Darstellungsfarben interpoliert, keine zusätzlichen Messwerte berechnet.
+Die tatsächliche räumliche Auflösung bleibt 2 km; eine straßengenaue
+Niederschlagsaussage ist daraus nicht möglich.
+Ein Fortschrittsbalken zeigt die tatsächlich geladenen Bilder der aktuellen
+Zeitleiste. Beim automatischen Aktualisieren alle fünf Minuten bleiben der
+gewählte Aufnahmezeitpunkt und eine laufende Wiedergabe erhalten. Ist der
+gewählte Zeitpunkt nicht mehr verfügbar, wird der zeitlich nächste gewählt.
+Neue Bilder werden ergänzt, bereits geladene weiterverwendet. Der explizite
+Neuladen-Knopf baut den Puffer dagegen neu auf und startet beim neuesten Bild.
+Eine zusätzliche Alterswarnung wird nicht angezeigt.
+
+Der BFF liest den offiziellen öffentlichen ORD-24h-Speicher
+`https://s3.waw3-1.cloudferro.com/openradar-24h`, dekodiert die GeoTIFFs und
+erzeugt PNGs in der ursprünglichen LAEA-Projektion. OpenLayers projiziert diese
+auf die Basiskarte. Pro Serverprozess werden maximal zwei Bilder gleichzeitig
+konvertiert; identische Anfragen teilen einen Ladevorgang. Konvertierte Bilder
+bleiben für das aktuelle Zeitfenster im Speicher, die Dateiliste für eine Minute.
+Der Browser lädt das neueste Bild zuerst und die Historie mit zwei parallelen
+Vorladevorgängen. Bei der ersten Anfrage sind Download und Konvertierung nötig.
+
+API: `/api/radar/europe/times` sowie
+`/api/radar/europe/frame/{Unixzeit-in-Millisekunden}.json` und `.png`.
+PNG-Antworten dürfen eine Stunde im Browsercache bleiben.
+Fehler erscheinen im Panel, ohne still auf Satellitendaten umzuschalten.
+
+Die GeoTIFF-Bandmetadaten unterscheiden `undetect` (bei den aktuellen Daten
+NaN: kein nachweisbarer Niederschlag) von `nodata` (-9999000: fehlende Messwerte).
+Fehlende Werte sowie Werte unter 0,1 mm/h bleiben transparent, ohne Schraffur.
+Der Hinweis in der Legende erklärt, dass keine Farbe nicht automatisch
+Trockenheit bedeutet. Außerhalb des gesamten Kompositrasters gibt es keine Darstellung.
+Radarabdeckung ist nicht mit der geometrischen Ausdehnung des Rasters
+gleichzusetzen. Die frühere Deutschland-Fokusmaske samt hervorgehobener
+Grenzlinie ist entfernt; die europäische Karte wird gleichmäßig hell dargestellt.
+Wetterstationen bleiben auf Deutschland beschränkt.
+
+Lizenz: **EUMETNET OPERA, CC BY 4.0**; Farbgebung, Transparenz und Reprojektion
+sind Bearbeitungen. Quellen- und Lizenzlinks stehen im Panel.
+Offizielle Dokumentation:
+https://eumetnet.github.io/openradardata-documentation/1-ORD-API-overview/
+Für eine spätere produktive Anbindung über MeteoGate werden ein API-Schlüssel
+und/oder der dokumentierte Benachrichtigungsdienst empfohlen; die aktuelle
+Implementierung nutzt den ebenfalls offiziell dokumentierten öffentlichen
+S3-Speicher.
+
+Gezielte Prüfungen: `node --test opera.test.mjs` und `npm run build`.
+
+OPERA ist der einzige sichtbare Regenradar-Layer. Das DWD-Niederschlagsradar
+bleibt als vorläufiger Fallback im Code und unter `/api/radar/times` erhalten.
+`DWD_RADAR_FALLBACK_ENABLED = false` in `src/App.tsx` blendet seine Steuerung aus;
+der Layer ist deaktiviert und lädt weder Zeitpunkte noch Bilder.
+Auch der Server lädt DWD-Radarzeitpunkte nicht mehr automatisch vor.
+Zum manuellen Reaktivieren kann der Schalter im Code auf `true` gesetzt werden;
+der DWD-Layer bleibt dann zunächst ausgeschaltet und separat wählbar.
+
+Die EUMETSAT-H60B-Niederschlagsschätzung wurde einschließlich Oberfläche,
+Ladelogik und API-Endpunkt entfernt. Satellit Infrarot (Wolken) bleibt erhalten.
+
 Der Layer "Satellit Infrarot" nutzt den EUMETSAT-WMS (msg_fes:ir108, Meteosat, 15-Minuten-Takt). /api/satellite/times liefert die letzten 13 Aufnahmezeitpunkte (3 Stunden) und wird fünf Minuten gecacht. Die Bilder sind etwa eine Stunde verzögert; es gibt Zeit-Slider und Deckkraftregler, aber noch keine Animation. Der DWD-Satellitenlayer wurde verworfen, da er nur alle 3 Stunden aktualisiert wird.

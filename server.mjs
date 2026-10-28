@@ -1,4 +1,7 @@
 import { createServer } from 'node:http'
+import { getOperaFrames, getOperaFrame } from './opera.mjs'
+import { getWarnings } from './warnings.mjs'
+import { recordStationAvailability } from './station-history.mjs'
 
 const DWD_POI_URL = 'https://opendata.dwd.de/weather/weather_reports/poi'
 const PORT = Number(process.env.PORT ?? 8787)
@@ -168,10 +171,16 @@ async function loadStations() {
         available.push(parseObservation(station, await response.text()))
       } catch (error) {
         console.warn(`DWD-Station ${station.id}:`, error.message)
-        unavailable.push({ id: station.id, name: station.name })
+        unavailable.push({ id: station.id, name: station.name, reason: error.message })
       }
     }
   }))
+
+  try {
+    await recordStationAvailability(available, unavailable)
+  } catch (error) {
+    console.error('Stations-Ausfallhistorie konnte nicht gespeichert werden:', error)
+  }
 
   if (available.length === 0) {
     throw new Error('Keine DWD-Station konnte geladen werden')
@@ -179,7 +188,7 @@ async function loadStations() {
 
   return {
     stations: available.sort((a, b) => a.id.localeCompare(b.id)),
-    unavailable,
+    unavailable: unavailable.map(({ id, name }) => ({ id, name })),
     total: stations.length,
     fetchedAt: new Date().toISOString(),
   }
@@ -344,9 +353,16 @@ function createEumetsatFramesGetter(layerName) {
 }
 
 const getSatelliteFrames = createEumetsatFramesGetter('msg_fes:ir108')
-const getEuropePrecipitationFrames = createEumetsatFramesGetter('msg_fes:h60b')
 
 const routes = {
+  '/api/warnings': {
+    load: getWarnings,
+    error: 'Amtliche DWD-Warnungen konnten nicht geladen werden.',
+  },
+  '/api/radar/europe/times': {
+    load: getOperaFrames,
+    error: 'Europäische OPERA-Radarzeitpunkte konnten nicht geladen werden.',
+  },
   '/api/stations': {
     load: getStations,
     error: 'DWD-Beobachtungsdaten konnten nicht geladen werden.',
@@ -358,10 +374,6 @@ const routes = {
   '/api/satellite/times': {
     load: getSatelliteFrames,
     error: 'EUMETSAT-Satellitenzeitpunkte konnten nicht geladen werden.',
-  },
-  '/api/precipitation-europe/times': {
-    load: getEuropePrecipitationFrames,
-    error: 'EUMETSAT-Niederschlagszeitpunkte konnten nicht geladen werden.',
   },
 }
 
@@ -380,6 +392,7 @@ async function getForecast(latitude, longitude) {
   url.searchParams.set('hourly', 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m')
   url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max')
   url.searchParams.set('timezone', 'Europe/Berlin')
+  url.searchParams.set('timeformat', 'unixtime')
   url.searchParams.set('forecast_days', '7')
   url.searchParams.set('forecast_hours', '24')
 
@@ -399,10 +412,103 @@ createServer(async (request, response) => {
   const requestUrl = new URL(request.url, 'http://localhost')
   const pathname = requestUrl.pathname
 
+  if (pathname === '/api/locations/search') {
+    const query = requestUrl.searchParams.get('q')?.trim() ?? ''
+    if (query.length < 2 || query.length > 100) {
+      response.writeHead(400, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ error: 'Bitte 2 bis 100 Zeichen für die Ortssuche eingeben.' }))
+      return
+    }
+    try {
+      if (/^\d{5}$/.test(query)) {
+        const upstream = await fetch(`https://api.zippopotam.us/de/${query}`, {
+          signal: AbortSignal.timeout(15000),
+        })
+        if (!upstream.ok && upstream.status !== 404) throw new Error(`PLZ-Suche antwortete mit HTTP ${upstream.status}.`)
+        const data = upstream.status === 404 ? null : await upstream.json()
+        const results = (data?.places ?? []).map((place, index) => ({
+          id: `${query}-${index}`,
+          name: `${place['place name']} (${query})`,
+          region: place.state ?? '',
+          country: 'Deutschland',
+          latitude: Number(place.latitude),
+          longitude: Number(place.longitude),
+        }))
+        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+        response.end(JSON.stringify({ results }))
+        return
+      }
+      const url = new URL('https://geocoding-api.open-meteo.com/v1/search')
+      url.searchParams.set('name', query)
+      url.searchParams.set('count', '8')
+      url.searchParams.set('language', 'de')
+      url.searchParams.set('format', 'json')
+      const countries = ['DE', 'AT', 'CH']
+      const responses = await Promise.all(countries.map(async (country) => {
+        const countryUrl = new URL(url)
+        countryUrl.searchParams.set('countryCode', country)
+        const upstream = await fetch(countryUrl, { signal: AbortSignal.timeout(15000) })
+        if (!upstream.ok) throw new Error(`Ortssuche antwortete mit HTTP ${upstream.status}.`)
+        const data = await upstream.json()
+        return (data.results ?? []).filter((place) => place.country_code === country)
+      }))
+      const results = responses.flat()
+        .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
+        .slice(0, 8).map((place) => ({
+        id: place.id,
+        name: place.name,
+        region: place.admin1 ?? '',
+        country: place.country ?? '',
+        latitude: place.latitude,
+        longitude: place.longitude,
+      }))
+      response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+      response.end(JSON.stringify({ results }))
+    } catch (error) {
+      response.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' })
+      response.end(JSON.stringify({ error: 'Ortssuche konnte nicht geladen werden.', detail: error.message }))
+    }
+    return
+  }
+
+  if (pathname.startsWith('/api/radar/europe/frame/')) {
+    const match = pathname.match(/^\/api\/radar\/europe\/frame\/(\d+)\.(json|png)$/)
+    if (!match || !Number.isFinite(Number(match[1])) ||
+      Number(match[1]) < 0 || Number(match[1]) > 8640000000000000) {
+      response.writeHead(400, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ error: 'Ungültiger OPERA-Zeitpunkt.' }))
+      return
+    }
+    try {
+      const time = new Date(Number(match[1])).toISOString()
+      const frame = await getOperaFrame(time)
+      if (match[2] === 'png') {
+        response.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=3600',
+        })
+        response.end(frame.png)
+      } else {
+        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+        response.end(JSON.stringify({
+          time, extent: frame.extent, projection: frame.projection,
+          url: `/api/radar/europe/frame/${match[1]}.png?render=2`,
+        }))
+      }
+    } catch (error) {
+      console.warn('OPERA-Bild fehlgeschlagen:', error.message)
+      response.writeHead(error.status ?? 502, { 'Content-Type': 'application/json; charset=utf-8' })
+      response.end(JSON.stringify({ error: 'OPERA-Radarbild konnte nicht geladen werden.', detail: error.message }))
+    }
+    return
+  }
+
   if (pathname === '/api/forecast') {
-    const latitude = Number(requestUrl.searchParams.get('lat'))
-    const longitude = Number(requestUrl.searchParams.get('lon'))
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+    const lat = requestUrl.searchParams.get('lat')
+    const lon = requestUrl.searchParams.get('lon')
+    const latitude = Number(lat)
+    const longitude = Number(lon)
+    if (!lat?.trim() || !lon?.trim() || !Number.isFinite(latitude) || !Number.isFinite(longitude)
       || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
       response.writeHead(400, { 'Content-Type': 'application/json' })
       response.end(JSON.stringify({ error: 'Ungültige Koordinaten' }))
@@ -447,7 +553,7 @@ createServer(async (request, response) => {
   console.log(`DWD-BFF läuft unter http://localhost:${PORT}`)
   // The EUMETSAT capabilities take several seconds, so keep the frame list warm.
   const warmUp = () => {
-    for (const load of [getSatelliteFrames, getEuropePrecipitationFrames, getRadarFrames]) {
+    for (const load of [getSatelliteFrames]) {
       load().catch((error) => console.warn('Vorladen fehlgeschlagen:', error.message))
     }
   }
