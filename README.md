@@ -250,7 +250,7 @@ Diese Karte ist **kein amtlicher Warnkanal oder Notfalldienst**. Daten können v
 - Betreiber-/Kontaktangaben und die Erforderlichkeit weiterer Kontaktmöglichkeiten prüfen; Vertragsgesellschaft, tatsächliches Hosting, Logs und Löschfristen klären und Rechtstexte daran ausrichten.
 - Lokale Einstellungsspeicherung und direkte Drittanbieterabrufe datenschutzrechtlich bewerten und gegebenenfalls technisch anpassen.
 - Offene Datenbedingungen und die Herkunft/Lizenz der noch eingebundenen Deutschland-Geometrie für den deaktivierten Radar-Fallback klären.
-- Die [DWD-Vorgaben für Quellenvermerke](https://www.wettergefahren.de/vorlagen_quellenangabe.html) nennen bei Warnungen ausdrücklich Vollständigkeit und Unverzüglichkeit. Die aktuelle Darstellung filtert und aktualisiert zeitweise; die Eignung der Verwendung und des Quellenvermerks vor Freigabe mit dem DWD klären.
+- Umsetzung der [DWD-Regeln für Quellenvermerke](https://www.wettergefahren.de/vorlagen_quellenangabe.html), ohne abschließende rechtliche Freigabe: Die bearbeitete Warnungsanzeige enthält keinen unmittelbaren Quellenvermerk, sondern einen sichtbaren Hinweis auf fehlende Vollständigkeits-/Aktualitätsgarantie und einen Link zu offiziellen Warnungen. Datenbasis und Bearbeitung sind zentral unter Quellen/Lizenzen und im Impressum dokumentiert. Stations-Quellenvermerke bleiben unverändert. Eine schriftliche Bestätigung kann optional über opendata@dwd.de angefragt werden.
 - Produktionsinstallation mit HTTPS, Last-/Ausfallverhalten, externer Alarmierung und tatsächlich erprobter Backup-Wiederherstellung abnehmen; Sicherheitsprüfung durchführen.
 
 Diese offenen Punkte sind eine Startcheckliste, keine behauptete behördliche Genehmigungspflicht.

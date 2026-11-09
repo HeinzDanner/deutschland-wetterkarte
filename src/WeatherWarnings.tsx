@@ -106,9 +106,8 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
   useEffect(() => {
     if (!map || !visible) return
     const overlay = new VectorLayer({
-      source: new VectorSource<WarningFeature>({
-        attributions: 'Warnungen / Warnings: <a href="https://www.dwd.de/warnungen" target="_blank" rel="noreferrer">Deutscher Wetterdienst</a>',
-      }),
+      // DWD-Quellenvermerk-Regeln umgesetzt; keine abschließende rechtliche Freigabe.
+      source: new VectorSource<WarningFeature>(),
       style: hitStyle,
       zIndex: 5,
     })
@@ -142,7 +141,7 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
   }, [map, visible])
 
   useEffect(() => {
-    const styles = warningStyles(t('DWD-Warnung', 'DWD warning'))
+    const styles = warningStyles(t('Wetterwarnung', 'Weather warning'))
     areasLayer.current?.setStyle((feature) => styles[feature.get('level') as number] ?? styles[0])
   }, [map, visible, t])
 
@@ -227,21 +226,26 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
 
   return (
     <div className="layer-group">
-      <p className="layer-group-title">{t('Amtliche Wetterwarnungen', 'Official weather warnings')}</p>
+      <p className="layer-group-title">{t('Wetterwarnungen', 'Weather warnings')}</p>
       <label className="layer-toggle">
         <input type="checkbox" checked={visible} onChange={(event) => onChange(event.target.checked)} />
         <span className="toggle-track" />
-        <span><strong>{t('DWD-Warnungen (Deutschland)', 'DWD warnings (Germany)')}</strong>
-          <small>{t('Warngebiete · Originaltext des DWD', 'Warning areas · original DWD text')}</small></span>
+        <span><strong>{t('Warngebiete (Deutschland)', 'Warning areas (Germany)')}</strong>
+          <small>{t('Eigene Darstellung · Originalwarntexte', 'Own presentation · original warning texts')}</small></span>
       </label>
       {visible && (
         <div className="warnings-panel">
-          <p className="radar-range-note">{t('Schraffierte Flächen mit gestricheltem Rand und „DWD-Warnung“ kennzeichnen amtliche Warngebiete, nicht die Regenintensität.', 'Hatched areas with dashed outlines and “DWD warning” labels indicate official warning areas, not rainfall intensity.')}</p>
+          <p className="radar-range-note">{t(
+            'Eigene Darstellung auf Basis von Wetterwarnungen; kein amtlicher Warnkanal. Vollständigkeit und Aktualität sind nicht gewährleistet. Maßgeblich sind die ',
+            'Own presentation based on weather warnings; not an official alert channel. Completeness and timeliness are not guaranteed. Please refer to the ',
+          )}<a href="https://www.dwd.de/warnungen" target="_blank" rel="noreferrer">{t('offiziellen Warnungen', 'official warnings')}</a>
+            {t(' des Deutschen Wetterdienstes.', ' issued by Deutscher Wetterdienst.')}</p>
+          <p className="radar-range-note">{t('Schraffierte Flächen mit gestricheltem Rand und „Wetterwarnung“ kennzeichnen aufbereitete Warngebiete, nicht die Regenintensität.', 'Hatched areas with dashed outlines and “Weather warning” labels indicate processed warning areas, not rainfall intensity.')}</p>
           {loading && <p role="status">{t('Warnungen werden geladen …', 'Loading warnings …')}</p>}
           {error && <p className="layer-error" role="alert">{t('Warnungen nicht verfügbar. Daraus lässt sich keine Warnfreiheit ableiten.', 'Warnings unavailable. This does not mean there are no warnings.')}</p>}
           {!error && fetchedAt && <p role="status">
             {count ? t(`${count} Warnmeldungen · Gebiete anklicken für Details.`, `${count} warnings · click an area for details.`)
-              : t('Der DWD liefert derzeit keine Warnungen für diese Ansicht.', 'DWD currently reports no warnings for this view.')}
+              : t('Keine Warnungen in dieser Darstellung. Daraus lässt sich keine Warnfreiheit ableiten.', 'No warnings in this presentation. This does not mean there are no warnings.')}
           </p>}
           {fetchedAt && <small>{t('Abgerufen', 'Fetched')}: {format.format(new Date(fetchedAt))}</small>}
           <button type="button" className="reload-button" onClick={() => setReload((value) => value + 1)}>
@@ -270,7 +274,6 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
               {warning.instruction && <p className="warning-original" lang="de">{warning.instruction}</p>}
             </section>
           ))}
-          <p><a href="https://www.dwd.de/warnungen" target="_blank" rel="noreferrer">{t('Quelle: DWD · Amtliche Warnungen', 'Source: DWD · Official warnings')}</a></p>
         </div>
       )}
     </div>

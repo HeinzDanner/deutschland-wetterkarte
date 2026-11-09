@@ -174,9 +174,13 @@ neue Historie.
     https://www.wettergefahren.de/vorlagen_quellenangabe.html besondere
     Vorgaben zu vollstaendiger und unverzueglicher Bereitstellung. Die Anwendung
     filtert Warnungen, aktualisiert den Browser alle fuenf Minuten und kann bei
-    Fehlern keine Echtzeitverfuegbarkeit garantieren. Ob diese Darstellung
-    einschliesslich Quellenvermerk der Zweckbestimmung entspricht, vor Freigabe
-    mit dem DWD klaeren; nicht allein aus allgemeinem Open-Data-Zugang ableiten.
+    Fehlern keine Echtzeitverfuegbarkeit garantieren. Umsetzung der DWD-Regeln
+    fuer Quellenvermerke, ohne abschliessende rechtliche Freigabe: Unmittelbare
+    Quellenvermerke der Warnungsanzeige wurden entfernt; ein sichtbarer Hinweis
+    grenzt die eigene Darstellung vom amtlichen Warnkanal ab und verlinkt auf
+    offizielle Warnungen. Datenbasis und Bearbeitung stehen auf der Quellen-Seite
+    und im Impressum. Stations-Quellenvermerke bleiben unveraendert. Optional
+    schriftliche Bestaetigung ueber opendata@dwd.de anfragen.
   - https://docs.zippopotam.us/docs/getting-started/ nennt GeoNames als Quelle
     aller Daten und beschreibt sie als ohne Gewaehr. GeoNames erwartet eine
     Quellenangabe: https://www.geonames.org/export/. Die App nennt beide Anbieter;

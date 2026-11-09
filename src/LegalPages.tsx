@@ -71,6 +71,12 @@ export function LegalPages() {
             'Der Betrieb als natürliche Person setzt keine Firma voraus. Register-, Vertretungs-, berufsrechtliche oder Umsatzsteuerangaben nur ergänzen, soweit tatsächlich einschlägig. Keine persönliche Steuer-ID oder Steuernummer veröffentlichen. Bei journalistisch-redaktionellen Inhalten zusätzliche Verantwortlichkeit prüfen.',
             'An individual operator does not need a company. Add registration, representation, professional or VAT details only where applicable. Do not publish a personal tax ID or tax number. Assess additional responsibility requirements for journalistic/editorial content.',
           )}</p>
+          <h3>{t('Datenbasis der Wetterwarnungen', 'Weather warning data source')}</h3>
+          <p>{t(
+            'Datenbasis: Deutscher Wetterdienst, Wetterwarnungen — Warngebiete zusammengeführt und gefiltert dargestellt. ',
+            'Data source: Deutscher Wetterdienst, weather warnings — warning areas merged and filtered for display. ',
+          )}{t('Weitere Angaben unter ', 'Further details under ')}
+            <a href="#quellen">{titles.quellen}</a>.</p>
         </>}
         {page === 'datenschutz' && <>
           <h3>{t('Verantwortlicher', 'Controller')}</h3>
@@ -131,8 +137,8 @@ export function LegalPages() {
               {' '}{t('Radarverbund RATE, 2 km. Bearbeitet: Rohwerte in farbige PNGs umgewandelt, niedrige/fehlende Werte transparent dargestellt, reprojiziert und bei der Anzeige interpoliert. Keine höhere Messauflösung durch Glättung.',
                 'RATE radar composite, 2 km. Modified: raw values converted into coloured PNGs, low/missing values made transparent, reprojected and interpolated for display. Smoothing does not increase measurement resolution.')}</li>
             <li><a href="https://www.dwd.de/">Deutscher Wetterdienst (DWD)</a>
-              {' – '}{t('Stationsbeobachtungen und amtliche Warnungen; Warnflächen für die Anzeige zusammengeführt. ',
-                'station observations and official warnings; warning polygons merged for display. ')}
+              {' – '}{t('Stationsbeobachtungen. Datenbasis: Deutscher Wetterdienst, Wetterwarnungen — Warngebiete zusammengeführt und gefiltert dargestellt. Aktualisierung alle fünf Minuten; Vollständigkeit und Aktualität nicht gewährleistet. ',
+                'Station observations. Data source: Deutscher Wetterdienst, weather warnings — warning areas merged and filtered for display. Updated every five minutes; completeness and timeliness are not guaranteed. ')}
               <a href="https://www.dwd.de/DE/service/rechtliche_hinweise/rechtliche_hinweise.html">{t('Rechtliche Hinweise', 'Legal information')}</a>.</li>
             <li><a href="https://www.eumetsat.int/">EUMETSAT</a>
               {' – '}{t('Meteosat-Infrarotbilder über view.eumetsat.int, msg_fes:ir108. Anzeige mit angepasstem Kontrast, Helligkeit und Überblendung.',
@@ -150,6 +156,10 @@ export function LegalPages() {
               {' – '}{t('Ortsdaten der Open-Meteo-Ortssuche; ', 'location data used by Open-Meteo geocoding; ')}
               <a href="https://www.geonames.org/export/">{t('Attributions- und Lizenzhinweise', 'attribution and licence information')}</a>.</li>
           </ul>
+          <p>{t(
+            'Die Anpassung der Warnungsanzeige setzt die DWD-Regeln für Quellenvermerke um; sie ist keine abschließende rechtliche Freigabe.',
+            'The warning display has been adapted to implement the DWD source attribution rules; this is not final legal clearance.',
+          )}</p>
           <p className="legal-draft">{t(
             'Noch offen vor Freigabe: konkrete EUMETSAT-WMS-Bedingungen, Zippopotam.us-Dienstbedingungen, produktbezogene DWD-Vorgaben insbesondere für Warnungen sowie Herkunft/Lizenz der eingebundenen Deutschland-Geometrie. Eine Quellenangabe ersetzt keine Nutzungserlaubnis.',
             'Still unresolved before clearance: exact EUMETSAT WMS terms, Zippopotam.us service terms, product-specific DWD requirements especially for warnings, and provenance/licence of the bundled Germany geometry. Attribution does not replace permission to use a source.',
