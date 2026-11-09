@@ -1,0 +1,7 @@
+services:
+  web:
+    environment:
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?Set BASIC_AUTH_USER in .env}
+      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?Set BASIC_AUTH_HASH in .env}
+    volumes:
+      - ./deploy/Caddyfile.private:/etc/caddy/Caddyfile:ro

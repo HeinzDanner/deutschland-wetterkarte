@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { LANGUAGE_KEY, preferencesAllowed } from './preferenceConsent'
+import { usePreferenceConsent } from './PreferenceConsentControls'
 
 export type Language = 'de' | 'en'
 export type Translate = (german: string, english: string) => string
-const STORAGE_KEY = 'weather-map-language'
 const LanguageContext = createContext<{
   language: Language
   locale: string
@@ -12,9 +13,10 @@ const LanguageContext = createContext<{
 } | null>(null)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
+  const { choice } = usePreferenceConsent()
   const [language, setLanguage] = useState<Language>(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'de'
+      return preferencesAllowed() && localStorage.getItem(LANGUAGE_KEY) === 'en' ? 'en' : 'de'
     } catch (error) {
       console.warn('Language preference could not be read:', error)
       return 'de'
@@ -25,11 +27,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = language
     document.title = t('Wetterkarte Europa', 'Europe Weather Map')
     try {
-      localStorage.setItem(STORAGE_KEY, language)
+      if (preferencesAllowed()) localStorage.setItem(LANGUAGE_KEY, language)
     } catch (error) {
       console.warn('Language preference could not be saved:', error)
     }
-  }, [language, t])
+  }, [language, t, choice])
   const value = useMemo(() => ({
     language, locale: language === 'en' ? 'en-GB' : 'de-DE', setLanguage, t,
   }), [language, t])

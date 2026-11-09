@@ -50,7 +50,7 @@ EUMETSAT-Bildnutzungsbedingungen zu klären (siehe [Datenquellen und Lizenzen](#
 | **Amtliche Warnungen** | DWD-Warnflächen mit Schraffur, Schweregrad und Beschriftung; Originaltexte, Gültigkeit und lokale Zuordnung per Klick. Die Warnabdeckung ist Deutschland, nicht ganz Europa. |
 | **Ortssuche** | Europäische Länderauswahl mit Deutschland als Vorauswahl, Ortsnamen sowie deutsche Postleitzahlen. Treffer zeigen Region und Land. |
 | **Punktvorhersage** | 24-Stunden-Verlauf und Sieben-Tage-Ausblick für Suchtreffer, Stationen oder Kartenklicks über Open-Meteo/DWD ICON, mit lokaler Zeitzone. Verfügbarkeit abhängig vom Datenanbieter. |
-| **Bedienung** | Deutsche und englische Oberfläche, responsive Kartenansicht, einklappbare mobile Bedienelemente und gespeicherte Karteneinstellungen. |
+| **Bedienung** | Deutsche und englische Oberfläche, responsive Kartenansicht, einklappbare mobile Bedienelemente und optional gespeicherte Karteneinstellungen. |
 | **Transparenz** | Sichtbare Kartenattribution, Quellen-/Lizenzübersicht, Wetterhinweise und ausdrücklich gekennzeichnete Entwürfe für Impressum und Datenschutz. |
 
 Die geografische Abdeckung unterscheidet sich je nach Quelle. Eine europaweite Ortssuche bedeutet weder flächendeckende Radarversorgung noch europaweite Stations- oder Warnungsdaten.
@@ -197,7 +197,7 @@ src/
   mapPreferences.ts          Validierte lokale Karteneinstellungen
   i18n.tsx                   Sprachumschaltung
   LegalPages.tsx             Quellen, Wetterhinweise und Rechtstext-Entwürfe
-  legalConfig.ts             Noch auszufüllende öffentliche Betreiberangaben
+  legalConfig.ts             Öffentliche Betreiberangaben und offene Betriebsdetails
 server.mjs                   HTTP-API, Datenabrufe und prozesslokale Caches
 opera.mjs                    GeoTIFF-zu-PNG-Pipeline und Request-Coalescing
 warnings.mjs                 Abruf und Normalisierung der DWD-Warnungen
@@ -227,7 +227,7 @@ Voraussetzungen, Domain-Konfiguration, Start, Updates und Sicherung sind in der 
 | [EUMETSAT](https://www.eumetsat.int/) | Meteosat-Infrarot über WMS; konkrete Bedingungen des verwendeten Angebots noch zu klären. |
 | [Open-Meteo](https://open-meteo.com/en/terms) | Vorhersage und Geocoding. Daten unter CC BY 4.0; kostenlose API nur für nichtkommerzielle Nutzung. Eine beruflich werbliche Portfolio-Nutzung ist nicht automatisch als nichtkommerziell anzunehmen. |
 | [GeoNames](https://www.geonames.org/export/) | Ortsdaten über Open-Meteo; Attribution beachten. |
-| [Zippopotam.us](https://www.zippopotam.us/) | Deutsche Postleitzahlen; Dienst- und Datenbedingungen noch abschließend prüfen. |
+| [Zippopotam.us](https://docs.zippopotam.us/docs/getting-started/) | Deutsche Postleitzahlen auf Basis von GeoNames; genaue Dienstbedingungen noch abschließend prüfen. |
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) | Kartendaten unter ODbL; zusätzlich gilt die [Nutzungsrichtlinie des Kachelservers](https://operations.osmfoundation.org/policies/tiles/). |
 
 Die **[Software-Lizenzhinweise](public/third-party-notices.txt)** werden beim Build aus den installierten Produktionsabhängigkeiten erzeugt. Sie ersetzen keine Prüfung der Wetter- und Geodatenlizenzen.
@@ -238,7 +238,7 @@ Die **[Software-Lizenzhinweise](public/third-party-notices.txt)** werden beim Bu
 
 Kartenkacheln werden direkt vom Browser bei OpenStreetMap geladen, Satellitenbilder bei aktiviertem Layer direkt bei EUMETSAT. Ortssuche und Vorhersage laufen über das Backend; Suchtexte beziehungsweise Koordinaten werden dabei an die jeweiligen Anbieter übermittelt. Ein Backend-Proxy macht diese Informationen nicht automatisch anonym.
 
-Sprache, Kartenausschnitt und Ebeneneinstellungen werden derzeit automatisch im `localStorage` gespeichert. Es sind keine Analyse-/Werbesoftware und keine Benutzerkonten eingebunden; ein Einwilligungsmanagement ist nicht implementiert.
+Sprache, Kartenausschnitt und Ebeneneinstellungen werden nur nach Zustimmung im `localStorage` gespeichert und gelesen. Die Entscheidung wird lokal mit Zeitpunkt und Textversion gespeichert; sie lässt sich im Seitenfuß jederzeit ändern oder widerrufen, wobei gespeicherte Einstellungen gelöscht werden. Ohne Zustimmung bleiben Änderungen nur während des Besuchs erhalten. Die lokale Entscheidung ist kein unabhängiger serverseitiger Einwilligungsnachweis. Die Einwilligung betrifft nicht direkte Drittanbieterabrufe. Es sind keine Analyse-/Werbesoftware und keine Benutzerkonten eingebunden; die rechtliche Bewertung steht aus.
 
 Impressum und Datenschutz sind über die Anwendung erreichbar, aber **ausdrücklich Entwürfe**. Betreiberangaben in `src/legalConfig.ts` sind öffentlich ausgelieferte Inhalte – dort gehören keine Zugangsdaten oder privaten Steuernummern hinein.
 
@@ -247,9 +247,10 @@ Diese Karte ist **kein amtlicher Warnkanal oder Notfalldienst**. Daten können v
 ## Vor der öffentlichen Freigabe
 
 - Den früher beobachteten Backend-Absturz bei einem Upstream-Timeout gezielt reproduzieren, beheben und mit Ausfalltests absichern.
-- Betreiber-/Kontaktangaben, tatsächliches Hosting, Auftragsverarbeitung, Logs und Löschfristen vervollständigen; Rechtstexte daran ausrichten.
+- Betreiber-/Kontaktangaben und die Erforderlichkeit weiterer Kontaktmöglichkeiten prüfen; Vertragsgesellschaft, tatsächliches Hosting, Logs und Löschfristen klären und Rechtstexte daran ausrichten.
 - Lokale Einstellungsspeicherung und direkte Drittanbieterabrufe datenschutzrechtlich bewerten und gegebenenfalls technisch anpassen.
 - Offene Datenbedingungen und die Herkunft/Lizenz der noch eingebundenen Deutschland-Geometrie für den deaktivierten Radar-Fallback klären.
+- Die [DWD-Vorgaben für Quellenvermerke](https://www.wettergefahren.de/vorlagen_quellenangabe.html) nennen bei Warnungen ausdrücklich Vollständigkeit und Unverzüglichkeit. Die aktuelle Darstellung filtert und aktualisiert zeitweise; die Eignung der Verwendung und des Quellenvermerks vor Freigabe mit dem DWD klären.
 - Produktionsinstallation mit HTTPS, Last-/Ausfallverhalten, externer Alarmierung und tatsächlich erprobter Backup-Wiederherstellung abnehmen; Sicherheitsprüfung durchführen.
 
 Diese offenen Punkte sind eine Startcheckliste, keine behauptete behördliche Genehmigungspflicht.

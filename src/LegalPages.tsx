@@ -52,8 +52,8 @@ export function LegalPages() {
         {(page === 'impressum' || page === 'datenschutz') && <p className="legal-draft" role="note">
           <strong>{t('Entwurf – nicht zur Veröffentlichung freigegeben.', 'Draft – not cleared for publication.')}</strong>{' '}
           {t(
-            'Betreiberangaben, tatsächlicher Serverbetrieb, Rechtsgrundlagen und Speicherdauern müssen vor dem Start ergänzt und geprüft werden. Dies ist keine rechtliche Freigabe.',
-            'Operator details, actual server operation, legal bases and retention periods must be completed and reviewed before launch. This is not legal clearance.',
+            'Angaben, tatsächlicher Serverbetrieb, Rechtsgrundlagen und Speicherdauern müssen vor dem Start geprüft und gegebenenfalls ergänzt werden. Dies ist keine rechtliche Freigabe.',
+            'Details, actual server operation, legal bases and retention periods must be reviewed and completed where necessary before launch. This is not legal clearance.',
           )}
         </p>}
         {page === 'impressum' && <>
@@ -76,17 +76,17 @@ export function LegalPages() {
           <h3>{t('Verantwortlicher', 'Controller')}</h3>
           <p>{t('Verantwortlich ist der im ', 'The controller is the operator listed in the ')}
             <a href="#impressum">{titles.impressum}</a>.
-            {' '}{t('Die Kontaktdaten sind vor Veröffentlichung zu ergänzen.', 'Contact details must be completed before publication.')}</p>
+            {' '}{t('Für Datenschutzanfragen nutze bitte die dort angegebene Kontakt-E-Mail.', 'For privacy enquiries, please use the contact email listed there.')}</p>
           <h3>{t('Hosting und Serverzugriffe', 'Hosting and server requests')}</h3>
           <p>{t(
-            'Der Betreiber nennt Hetzner als Hoster. Die genaue Vertragsgesellschaft und der gebuchte Standort sind noch zu bestätigen. Beim Abruf der Website werden insbesondere IP-Adresse, Zeitpunkt, angeforderte URL und technische Browser-/Verbindungsinformationen an den Webserver übermittelt, um die Website auszuliefern und zu schützen.',
-            'The operator has named Hetzner as hosting provider. The contracting entity and selected server location remain to be confirmed. Requests transmit in particular an IP address, time, requested URL and technical browser/connection information to the server to deliver and protect the website.',
+            'Für den geplanten Betrieb ist ein Server bei Hetzner vorgesehen. Mit dem Hosting-Anbieter wurde ein Auftragsverarbeitungsvertrag abgeschlossen; die genaue Vertragsgesellschaft ist anhand der Unterlagen zu prüfen. Beim Abruf der Website werden insbesondere IP-Adresse, Zeitpunkt, angeforderte URL und technische Browser-/Verbindungsinformationen an den Webserver übermittelt, um die Website auszuliefern und zu schützen.',
+            'A server at Hetzner is intended for operation. A data processing agreement has been concluded with the hosting provider; the exact contracting entity must be checked against the contract. Requests transmit in particular an IP address, time, requested URL and technical browser/connection information to the server to deliver and protect the website.',
           )}</p>
           <p>{t('Serverstandort: ', 'Server location: ')}{legalConfig.hostingLocation || missing}<br />
             {t('Protokolle und Löschfristen: ', 'Logs and retention: ')}{legalConfig.loggingAndRetention || missing}</p>
           <p>{t(
-            'Die vorbereitete Caddy-Konfiguration aktiviert keine Zugriffsprotokolle. Betriebs- und Fehlerprotokolle sowie etwaige Provider-, Firewall- oder Proxy-Protokolle sind davon zu unterscheiden; der tatsächliche Betrieb ist noch abzugleichen. Auftragsverarbeitung, Empfänger, Rechtsgrundlage und Löschfristen sind vor Freigabe festzulegen.',
-            'The prepared Caddy configuration does not enable access logs. Operational and error logs, and any provider, firewall or proxy logs are separate; actual operation still needs to be checked. Processing arrangements, recipients, legal basis and retention must be established before clearance.',
+            'Die vorbereitete Caddy-Konfiguration aktiviert keine Zugriffsprotokolle. Betriebs- und Fehlerprotokolle sowie etwaige Provider-, Firewall- oder Proxy-Protokolle sind davon zu unterscheiden; der tatsächliche Betrieb ist noch abzugleichen. Empfänger, Rechtsgrundlage und Löschfristen sind vor Freigabe festzulegen.',
+            'The prepared Caddy configuration does not enable access logs. Operational and error logs, and any provider, firewall or proxy logs are separate; actual operation still needs to be checked. Recipients, legal basis and retention must be established before clearance.',
           )}</p>
           <a href="https://www.hetzner.com/legal/privacy-policy/">{t('Datenschutzhinweise von Hetzner', 'Hetzner privacy policy')}</a>
           <h3>{t('Direkte Verbindungen zu Karten- und Satellitenanbietern', 'Direct map and satellite connections')}</h3>
@@ -103,12 +103,12 @@ export function LegalPages() {
           )}</p>
           <h3>{t('Lokale Einstellungen und technische Speicherung', 'Local preferences and technical storage')}</h3>
           <p>{t(
-            'Im localStorage dieses Browsers werden weather-map-language (Sprache), weather-map-view (Kartenausschnitt) und weather-map-layers (Ebenen und Satellitendeckkraft) gespeichert. Diese Einstellungen werden bei weiteren Besuchen gelesen und bleiben bis zum Löschen der Website-Daten im Browser erhalten. Die App speichert dort keinen Suchverlauf. Der Browser kann Bilder und andere Dateien nach den HTTP-Cache-Regeln zwischenspeichern. Das Löschen von Website-Daten entfernt auch die Einstellungen.',
-            'This browser’s localStorage stores weather-map-language (language), weather-map-view (map view) and weather-map-layers (layers and satellite opacity). These settings are read on future visits and remain until website data is deleted in the browser. The app does not store search history there. The browser may cache images and other files according to HTTP cache rules. Deleting website data also removes preferences.',
+            'Nur mit deiner Einwilligung speichern und lesen wir im localStorage weather-map-language (Sprache), weather-map-view (Kartenausschnitt) und weather-map-layers (Ebenen und Satellitendeckkraft). Ohne Einwilligung bleiben Änderungen nur im laufenden Besuch erhalten. Du kannst über „Speichereinstellungen“ im Seitenfuß jederzeit widerrufen; gespeicherte Einstellungen werden dabei gelöscht. Die Entscheidung selbst wird mit Zeitpunkt und Version unter weather-map-preference-consent auf diesem Gerät gespeichert, bis du die Website-Daten löschst oder die Entscheidung änderst. Sie wird nicht an unseren Server übertragen. Die App speichert dort keinen Suchverlauf. Der Browser kann Dateien nach HTTP-Cache-Regeln zwischenspeichern.',
+            'Only with your consent do we store and read weather-map-language (language), weather-map-view (map view) and weather-map-layers (layers and satellite opacity) in localStorage. Without consent, changes last only for the current visit. You can withdraw using “Storage settings” in the footer; saved preferences are then deleted. The decision itself, including time and version, is stored under weather-map-preference-consent on this device until you delete website data or change the decision. It is not sent to our server. The app does not store search history there. The browser may cache files under HTTP cache rules.',
           )}</p>
           <p>{t(
-            'Die App enthält derzeit keine eingebundene Analyse- oder Werbesoftware und keine Benutzerkonten. Das ersetzt keine Prüfung: § 25 TDDDG betrifft auch localStorage. Ob die automatische Einstellungsspeicherung erforderlich ist oder eine vorherige Einwilligung bzw. technische Änderung benötigt, ist vor Veröffentlichung zu klären. Ein Einwilligungsmanagement ist derzeit nicht implementiert.',
-            'The app currently includes no analytics or advertising software and no user accounts. This does not replace an assessment: section 25 TDDDG also covers localStorage. Before publication, determine whether automatic preference storage is necessary or requires prior consent or a technical change. Consent management is not currently implemented.',
+            'Die Entscheidung zur Einstellungsspeicherung betrifft nicht die direkten Verbindungen zu Dritten. Die App enthält derzeit keine eingebundene Analyse- oder Werbesoftware und keine Benutzerkonten. Rechtsgrundlagen, Nachweis und Angemessenheit der Einwilligung sowie die Verarbeitung durch Dritte sind vor Veröffentlichung zu prüfen.',
+            'The preference storage choice does not cover direct third-party connections. The app currently includes no analytics or advertising software and no user accounts. Legal bases, consent evidence and adequacy, and third-party processing must be reviewed before publication.',
           )}</p>
           <p>{t(
             'Serverseitige Caches dienen der Bereitstellung von Wetterdaten. Die Stations-Ausfallhistorie enthält Stationskennungen und Verfügbarkeitsereignisse, keine beabsichtigte Besucherhistorie.',
@@ -116,8 +116,8 @@ export function LegalPages() {
           )}</p>
           <h3>{t('Kontakt und Rechte', 'Contact and rights')}</h3>
           <p>{t(
-            'Bei Kontaktaufnahme werden übermittelte Kontaktdaten und Nachrichten zur Bearbeitung des Anliegens verarbeitet. Rechtsgrundlage und Löschfristen sind vom Betreiber noch festzulegen. Nach Maßgabe der DSGVO bestehen Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch; soweit eine Einwilligung verwendet wird, kann sie mit Wirkung für die Zukunft widerrufen werden. Beschwerden sind bei einer Datenschutzaufsichtsbehörde möglich. Zuständige Behörde und Kontakt des Verantwortlichen vor Veröffentlichung ergänzen.',
-            'Contact details and messages submitted when contacting the operator are processed to handle the enquiry. The operator must still determine the legal basis and retention. Subject to GDPR conditions, rights include access, rectification, erasure, restriction, portability and objection; any consent may be withdrawn for the future. Complaints may be lodged with a data protection supervisory authority. Add the competent authority and controller contact before publication.',
+            'Bei Kontaktaufnahme werden übermittelte Kontaktdaten und Nachrichten zur Bearbeitung des Anliegens verarbeitet. Rechtsgrundlage und Löschfristen sind vom Betreiber noch festzulegen. Nach Maßgabe der DSGVO bestehen Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch; soweit eine Einwilligung verwendet wird, kann sie mit Wirkung für die Zukunft widerrufen werden, ohne die Rechtmäßigkeit der vorherigen Verarbeitung zu berühren. Beschwerden sind bei einer Datenschutzaufsichtsbehörde möglich, insbesondere bei der Berliner Beauftragten für Datenschutz und Informationsfreiheit.',
+            'Contact details and messages submitted when contacting the operator are processed to handle the enquiry. The operator must still determine the legal basis and retention. Subject to GDPR conditions, rights include access, rectification, erasure, restriction, portability and objection; any consent may be withdrawn for the future without affecting the lawfulness of prior processing. Complaints may be lodged with a data protection supervisory authority, including the Berlin Commissioner for Data Protection and Freedom of Information.',
           )}</p>
         </>}
         {page === 'quellen' && <>
@@ -144,14 +144,15 @@ export function LegalPages() {
               {' '}{t('Die kostenlose API ist nur für nichtkommerzielle Nutzung vorgesehen; auch Werbung und werbliche Aktivitäten beachten.',
                 'The free API is for non-commercial use only; advertising and promotional activities must also be considered.')}</li>
             <li><a href="https://www.zippopotam.us/">Zippopotam.us</a>
-              {' – '}{t('deutsche Postleitzahlsuche.', 'German postcode lookup.')}</li>
+              {' – '}{t('deutsche Postleitzahlsuche mit Daten von ', 'German postcode lookup using data from ')}
+              <a href="https://www.geonames.org/">GeoNames</a>.</li>
             <li><a href="https://www.geonames.org/">GeoNames</a>
               {' – '}{t('Ortsdaten der Open-Meteo-Ortssuche; ', 'location data used by Open-Meteo geocoding; ')}
               <a href="https://www.geonames.org/export/">{t('Attributions- und Lizenzhinweise', 'attribution and licence information')}</a>.</li>
           </ul>
           <p className="legal-draft">{t(
-            'Noch offen vor Freigabe: konkrete EUMETSAT-WMS-Bedingungen, Zippopotam.us-Dienst- und Datenbedingungen, produktbezogene DWD-Vorgaben sowie Herkunft/Lizenz der eingebundenen Deutschland-Geometrie. Eine Quellenangabe ersetzt keine Nutzungserlaubnis.',
-            'Still unresolved before clearance: exact EUMETSAT WMS terms, Zippopotam.us service and data terms, product-specific DWD requirements and provenance/licence of the bundled Germany geometry. Attribution does not replace permission to use a source.',
+            'Noch offen vor Freigabe: konkrete EUMETSAT-WMS-Bedingungen, Zippopotam.us-Dienstbedingungen, produktbezogene DWD-Vorgaben insbesondere für Warnungen sowie Herkunft/Lizenz der eingebundenen Deutschland-Geometrie. Eine Quellenangabe ersetzt keine Nutzungserlaubnis.',
+            'Still unresolved before clearance: exact EUMETSAT WMS terms, Zippopotam.us service terms, product-specific DWD requirements especially for warnings, and provenance/licence of the bundled Germany geometry. Attribution does not replace permission to use a source.',
           )}</p>
           <h3>{t('Software', 'Software')}</h3>
           <p>{t('Verwendet werden unter anderem React, OpenLayers, proj4, geotiff, pngjs und polygon-clipping. ',

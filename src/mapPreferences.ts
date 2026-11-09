@@ -1,3 +1,5 @@
+import { preferencesAllowed } from './preferenceConsent.ts'
+
 export const MAP_VIEW_KEY = 'weather-map-view'
 export const MAP_LAYERS_KEY = 'weather-map-layers'
 export const DEFAULT_VIEW = { center: [10.5, 51.5], zoom: 4.6 }
@@ -25,6 +27,7 @@ export function validLayers(value: unknown): value is typeof DEFAULT_LAYERS {
 
 export function readPreference<T>(key: string, fallback: T, valid: (value: unknown) => value is T): T {
   try {
+    if (!preferencesAllowed()) return fallback
     const raw = localStorage.getItem(key)
     if (raw === null) return fallback
     const value: unknown = JSON.parse(raw)
@@ -38,6 +41,7 @@ export function readPreference<T>(key: string, fallback: T, valid: (value: unkno
 
 export function savePreference(key: string, value: unknown) {
   try {
+    if (!preferencesAllowed()) return
     localStorage.setItem(key, JSON.stringify(value))
   } catch (error) {
     console.warn('Map preference could not be saved:', error)

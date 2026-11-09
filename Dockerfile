@@ -24,3 +24,4 @@ CMD ["node", "server.mjs"]
 FROM caddy:2-alpine AS web
 COPY --from=frontend-build /app/dist /srv
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY deploy/weather-app.caddy /etc/caddy/weather-app.caddy

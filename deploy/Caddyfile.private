@@ -1,0 +1,7 @@
+{$SITE_ADDRESS} {
+	basic_auth {
+		{env.BASIC_AUTH_USER} {env.BASIC_AUTH_HASH}
+	}
+
+	import /etc/caddy/weather-app.caddy
+}

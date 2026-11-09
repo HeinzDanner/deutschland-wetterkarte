@@ -5,6 +5,63 @@ einzelne Instanz mit Docker Compose v2: Caddy liefert das gebaute Frontend
 und leitet `/api/*` intern an Node weiter. Nur Caddy ist von aussen erreichbar.
 Ein Nutzerkonto ist nicht erforderlich.
 
+**Kein Zugangsschutz:** Die folgende Standardkonfiguration ist nach DNS- und
+Firewall-Freigabe oeffentlich erreichbar, auch wenn sie als Beta bezeichnet
+wird. Fuer einen geschuetzten Testbetrieb vor dem Start einen geeigneten
+Zugangsschutz einrichten und aus einem fremden Netz pruefen. HTTPS allein
+beschraenkt den Zugriff nicht.
+
+## Passwortgeschuetzter Test
+
+Das optionale `compose.private.yaml` schuetzt Website und API gemeinsam mit
+Caddy Basic Auth. Alle Compose-Befehle fuer diesen Test muessen beide Dateien
+angeben; die Standardkonfiguration allein ist nicht geschuetzt. Basic Auth
+verhindert keine automatisierten Passwortversuche: ein langes, einmaliges
+Passwort verwenden und den Zugang bei Bedarf zusaetzlich per Firewall begrenzen.
+
+Im Projektordner auf dem Server `.env` mit restriktiven Rechten anlegen.
+`SITE_ADDRESS` muss eine Domain ohne Schema sein, die auf diesen Server zeigt;
+kein `http://` verwenden. Das Passwort nicht in die Shell-History schreiben.
+Einen bcrypt-Hash interaktiv erzeugen:
+
+```sh
+sudo docker run --rm -it caddy:2-alpine caddy hash-password
+```
+
+In `.env` eintragen, dabei den Hash durch die Ausgabe ersetzen und die einfachen
+Anfuehrungszeichen beibehalten, damit Compose die Dollarzeichen nicht auswertet:
+
+```text
+SITE_ADDRESS=weather.example.com
+BASIC_AUTH_USER=tester
+BASIC_AUTH_HASH='$2a$HASH_AUS_CADDY'
+```
+
+Die Datei darf nicht geteilt oder committed werden. Beispielsweise mit
+`chmod 600 .env` den Zugriff einschraenken. Nicht `docker compose config`
+ohne `--quiet` ausgeben, da es den Hash anzeigen kann.
+
+```sh
+docker compose -f compose.yaml -f compose.private.yaml config --quiet
+docker compose -f compose.yaml -f compose.private.yaml up -d --build
+docker compose -f compose.yaml -f compose.private.yaml ps
+```
+
+Nach Zertifikatausstellung ausschliesslich HTTPS verwenden. Ohne Anmeldung
+muessen sowohl `/` als auch `/api/health` HTTP 401 liefern; mit Anmeldung
+muss die Website funktionieren und `/api/health` HTTP 200 liefern. Auch von
+einem anderen Netz pruefen. Falls die Anmeldung nicht wie erwartet greift,
+den Web-Container sofort stoppen:
+
+```sh
+docker compose -f compose.yaml -f compose.private.yaml stop web
+```
+
+Die folgenden allgemeinen Start-, Log- und Update-Befehle beziehen sich auf die
+ungeschuetzte Standardkonfiguration. Fuer den privaten Test jeweils
+`-f compose.yaml -f compose.private.yaml` ergaenzen, insbesondere bei Updates
+und Neustarts, damit nicht versehentlich der Schutz entfernt wird.
+
 ## Voraussetzungen
 
 - Linux-Server mit Docker Engine und Compose v2, Git und einer Domain.
@@ -95,20 +152,43 @@ neue Historie.
   im Footer (auch direkt als `/#impressum`, `/#datenschutz`, `/#quellen`,
   `/#wetterhinweise` erreichbar, ohne zusaetzliche Server-Routen).
   Impressum und Datenschutz sind ausdruecklich **Entwuerfe**, keine Freigabe.
-  Oeffentliche Betreiberangaben in `src/legalConfig.ts` eintragen; diese Werte
+  Oeffentliche Betreiberangaben in `src/legalConfig.ts` pruefen; diese Werte
   landen im ausgelieferten Frontend und gegebenenfalls im oeffentlichen Repository.
   Niemals Zugangsdaten oder persoenliche Steuernummern dort eintragen.
-  Der Betreiber nennt Hetzner als Hoster; Vertragsgesellschaft, gebuchten Standort,
-  Auftragsverarbeitung, tatsaechliche Logs und Loeschfristen noch bestaetigen.
+  Fuer den vorgesehenen Hetzner-Server in Falkenstein ist laut Betreiber ein
+  AV-Vertrag abgeschlossen; Vertragsgesellschaft, tatsaechliche Logs und
+  Loeschfristen noch anhand des konkreten Betriebs pruefen.
   Entwurfshinweise in `src/LegalPages.tsx` erst nach inhaltlicher Pruefung entfernen.
 - `npm run notices` erzeugt `public/third-party-notices.txt` aus den installierten
   Produktionsabhaengigkeiten; `npm run build` fuehrt dies automatisch aus.
   Fehlende Lizenztexte brechen die Erzeugung ab und muessen geprueft werden.
   Nach Abhaengigkeitsaenderungen die Datei aktualisieren und mit ausliefern.
-- Automatische localStorage-Einstellungen und direkte Browserabrufe bei OSM und
-  EUMETSAT auf Rechtsgrundlagen/Einwilligung pruefen; noch kein Consent-Management.
+- Die freiwillige localStorage-Einstellungsspeicherung, lokale Dokumentation der
+  Entscheidung und direkte Browserabrufe bei OSM/EUMETSAT rechtlich pruefen.
+  Die lokale Entscheidung ist kein unabhaengiger serverseitiger Nachweis.
 - Quellen/Lizenzen nennt offene EUMETSAT-, Zippopotam.us-, DWD-Produkt- und
   Deutschland-Geometrie-Pruefungen. Auch die eigene Code-Lizenz ist noch offen.
+- Recherche zu Datenbedingungen (keine Freigabe):
+  - DWD Open Data verweist fuer die POI-Stationsdateien auf
+    https://www.dwd.de/copyright. Fuer Warnungen nennt
+    https://www.wettergefahren.de/vorlagen_quellenangabe.html besondere
+    Vorgaben zu vollstaendiger und unverzueglicher Bereitstellung. Die Anwendung
+    filtert Warnungen, aktualisiert den Browser alle fuenf Minuten und kann bei
+    Fehlern keine Echtzeitverfuegbarkeit garantieren. Ob diese Darstellung
+    einschliesslich Quellenvermerk der Zweckbestimmung entspricht, vor Freigabe
+    mit dem DWD klaeren; nicht allein aus allgemeinem Open-Data-Zugang ableiten.
+  - https://docs.zippopotam.us/docs/getting-started/ nennt GeoNames als Quelle
+    aller Daten und beschreibt sie als ohne Gewaehr. GeoNames erwartet eine
+    Quellenangabe: https://www.geonames.org/export/. Die App nennt beide Anbieter;
+    die Startseite https://docs.zippopotam.us/ nennt keine festen Limits. Das ist
+    keine Verfuegbarkeitsgarantie; weitere Dienstbedingungen bleiben zu klaeren.
+  - OSM-Kacheln: https://operations.osmfoundation.org/policies/tiles/ verlangt
+    u. a. sichtbare Attribution, Referer und Caching; Browser-/Caddy-Verhalten
+    sowie Kapazitaet unter der echten Domain vor Freigabe pruefen.
+  - `src/data/germany.json` wird fuer den standardmaessig ausgeschalteten
+    DWD-Radar-Fallback eingebunden; die Herkunft ist nicht nachgewiesen und
+    die Datei ist trotzdem Teil des Projekts. Vor oeffentlichem Repository und
+    Auslieferung Provenienz/Lizenz klaeren oder geeignet ersetzen.
 - Container-Build und HTTPS auf dem Zielserver tatsaechlich pruefen.
 - Kalten Radarstart, mehrere parallele Browser, Fehlerzustaende und
   Erreichbarkeit vom Handy ueber Mobilfunk erproben.

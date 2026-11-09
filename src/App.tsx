@@ -26,6 +26,7 @@ import { WeatherWarnings } from './WeatherWarnings'
 import { LocationSearch, type ForecastLocation } from './LocationSearch'
 import { useLanguage } from './i18n'
 import { LegalPages } from './LegalPages'
+import { PreferenceConsentControls, usePreferenceConsent } from './PreferenceConsentControls'
 import { DEFAULT_VIEW, DEFAULT_LAYERS, MAP_VIEW_KEY, MAP_LAYERS_KEY, readPreference, savePreference, validView, validLayers } from './mapPreferences'
 import './map.css'
 
@@ -66,6 +67,7 @@ function clipLayerToGermany(layer: ImageLayer<ImageWMS>, outside: boolean) {
 }
 
 function App() {
+  const { choice } = usePreferenceConsent()
   const [initialView] = useState(() => readPreference(MAP_VIEW_KEY, DEFAULT_VIEW, validView))
   const [initialLayers] = useState(() => readPreference(MAP_LAYERS_KEY, DEFAULT_LAYERS, validLayers))
   const [warningsVisible, setWarningsVisible] = useState(initialLayers.warnings)
@@ -171,7 +173,18 @@ function App() {
       opera: operaVisible, satellite: satelliteVisible, stations: stationsVisible,
       warnings: warningsVisible, satelliteOpacity,
     })
-  }, [operaVisible, satelliteVisible, stationsVisible, warningsVisible, satelliteOpacity])
+  }, [operaVisible, satelliteVisible, stationsVisible, warningsVisible, satelliteOpacity, choice])
+
+  useEffect(() => {
+    if (choice !== 'accepted' || !map.current) return
+    const view = map.current.getView()
+    const center = view.getCenter()
+    const zoom = view.getZoom()
+    if (!center || zoom === undefined) return
+    const [longitude, latitude] = toLonLat(center)
+    const preference = { center: [((longitude + 180) % 360 + 360) % 360 - 180, latitude], zoom }
+    if (validView(preference)) savePreference(MAP_VIEW_KEY, preference)
+  }, [choice, mapReady])
 
   useEffect(() => {
     const currentMap = map.current
@@ -1115,6 +1128,7 @@ function App() {
       </section>
       <footer>
         <LegalPages />
+        <PreferenceConsentControls />
         {t(
           'Datenquellen: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Kartenbasis: OpenStreetMap',
           'Data sources: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Map base: OpenStreetMap',
