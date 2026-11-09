@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import type OlMap from 'ol/Map'
 import Feature from 'ol/Feature'
 import type Geometry from 'ol/geom/Geometry'
+import MultiPolygon from 'ol/geom/MultiPolygon'
 import GeoJSON from 'ol/format/GeoJSON'
 import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
-import { Fill, Stroke, Style } from 'ol/style'
+import { Fill, Stroke, Style, Text } from 'ol/style'
 import { unByKey } from 'ol/Observable'
 import { useLanguage } from './i18n'
+import { mergeWarningAreas } from './warningAreas'
 
 type Warning = {
   identifier: string
@@ -24,11 +26,52 @@ type Warning = {
 }
 type WarningFeature = Feature<Geometry>
 const COLORS = ['#7a8a99', '#f4d03f', '#f39c12', '#e53935', '#9c27b0']
-const styles = COLORS.map((color, level) => new Style({
-  fill: new Fill({ color: `${color}22` }),
-  stroke: new Stroke({ color, width: 2, lineDash: level === 0 ? [4, 4] : undefined }),
-  zIndex: level,
-}))
+const hitStyle = new Style({ fill: new Fill({ color: 'rgba(0,0,0,0)' }) })
+
+function warningStyles(label: string) {
+  return COLORS.map((color, level) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 14
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Warngebiete: Canvas-Kontext nicht verfügbar.')
+    context.fillStyle = `${color}12`
+    context.fillRect(0, 0, 14, 14)
+    context.strokeStyle = `${color}88`
+    context.lineWidth = 1.5
+    context.beginPath()
+    context.moveTo(-7, 14)
+    context.lineTo(14, -7)
+    context.moveTo(0, 21)
+    context.lineTo(21, 0)
+    context.stroke()
+    const pattern = context.createPattern(canvas, 'repeat')
+    if (!pattern) throw new Error('Warngebiete: Schraffur konnte nicht erstellt werden.')
+    return [
+      new Style({
+        fill: new Fill({ color: pattern }),
+        stroke: new Stroke({ color, width: 2.5, lineDash: [8, 4] }),
+        zIndex: level,
+      }),
+      new Style({
+        geometry: (feature) => {
+          const polygons = (feature.getGeometry() as MultiPolygon).getPolygons()
+          return polygons.reduce((largest, polygon) =>
+            polygon.getArea() > largest.getArea() ? polygon : largest).getInteriorPoint()
+        },
+        text: new Text({
+          text: `⚠ ${label} · ${level || '–'}`,
+          font: 'bold 12px system-ui',
+          fill: new Fill({ color: '#102a40' }),
+          backgroundFill: new Fill({ color: '#fffffff0' }),
+          backgroundStroke: new Stroke({ color, width: 2 }),
+          padding: [5, 7, 5, 7],
+          overflow: true,
+        }),
+        zIndex: 10 + level,
+      }),
+    ]
+  })
+}
 
 export function WeatherWarnings({ map, visible, onChange, onDetails }: {
   map: OlMap | null
@@ -45,6 +88,7 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
   const [fetchedAt, setFetchedAt] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
   const layer = useRef<VectorLayer<VectorSource<WarningFeature>> | null>(null)
+  const areasLayer = useRef<VectorLayer<VectorSource<WarningFeature>> | null>(null)
   const detailsCallback = useRef(onDetails)
   detailsCallback.current = onDetails
   const format = new Intl.DateTimeFormat(locale, {
@@ -65,11 +109,18 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
       source: new VectorSource<WarningFeature>({
         attributions: 'Warnungen / Warnings: <a href="https://www.dwd.de/warnungen" target="_blank" rel="noreferrer">Deutscher Wetterdienst</a>',
       }),
-      style: (feature) => styles[(feature.get('warning') as Warning).level] ?? styles[0],
+      style: hitStyle,
       zIndex: 5,
     })
+    const areas = new VectorLayer({
+      source: new VectorSource<WarningFeature>(),
+      zIndex: 6,
+      declutter: true,
+    })
+    areasLayer.current = areas
     layer.current = overlay
     map.addLayer(overlay)
+    map.addLayer(areas)
     const click = map.on('singleclick', (event) => {
       const station = map.forEachFeatureAtPixel(event.pixel, (feature) => feature.get('features') ? true : undefined)
       if (station) return
@@ -84,13 +135,43 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
     return () => {
       unByKey(click)
       map.removeLayer(overlay)
+      map.removeLayer(areas)
       layer.current = null
+      areasLayer.current = null
     }
   }, [map, visible])
 
   useEffect(() => {
+    const styles = warningStyles(t('DWD-Warnung', 'DWD warning'))
+    areasLayer.current?.setStyle((feature) => styles[feature.get('level') as number] ?? styles[0])
+  }, [map, visible, t])
+
+  useEffect(() => {
     layer.current?.getSource()?.clear()
     layer.current?.getSource()?.addFeatures(active)
+  }, [features, now, map, visible])
+
+  useEffect(() => {
+    const source = areasLayer.current?.getSource()
+    source?.clear()
+    const current = features.filter((feature) => Date.parse((feature.get('warning') as Warning).expires) > now)
+    if (!current.length || !source) return
+    try {
+      const format = new GeoJSON()
+      const objects = current.map((feature) => ({
+        geometry: format.writeGeometryObject(feature.getGeometry()!) as {
+          type: string; coordinates: number[][][] | number[][][][]
+        },
+        properties: feature.get('warning') as Warning,
+      }))
+      const merged = mergeWarningAreas(objects)
+      source.addFeatures(format.readFeatures({ type: 'FeatureCollection', features: merged }))
+    } catch (reason) {
+      console.error('DWD warning areas could not be merged:', reason)
+      setError(true)
+      layer.current?.getSource()?.clear()
+      setSelected([])
+    }
   }, [features, now, map, visible])
 
   useEffect(() => {
@@ -155,6 +236,7 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
       </label>
       {visible && (
         <div className="warnings-panel">
+          <p className="radar-range-note">{t('Schraffierte Flächen mit gestricheltem Rand und „DWD-Warnung“ kennzeichnen amtliche Warngebiete, nicht die Regenintensität.', 'Hatched areas with dashed outlines and “DWD warning” labels indicate official warning areas, not rainfall intensity.')}</p>
           {loading && <p role="status">{t('Warnungen werden geladen …', 'Loading warnings …')}</p>}
           {error && <p className="layer-error" role="alert">{t('Warnungen nicht verfügbar. Daraus lässt sich keine Warnfreiheit ableiten.', 'Warnings unavailable. This does not mean there are no warnings.')}</p>}
           {!error && fetchedAt && <p role="status">

@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import { getOperaFrames, getOperaFrame } from './opera.mjs'
 import { getWarnings } from './warnings.mjs'
 import { recordStationAvailability } from './station-history.mjs'
+import { searchLocations } from './location-search.mjs'
 
 const DWD_POI_URL = 'https://opendata.dwd.de/weather/weather_reports/poi'
 const PORT = Number(process.env.PORT ?? 8787)
@@ -391,7 +392,7 @@ async function getForecast(latitude, longitude) {
   url.searchParams.set('longitude', longitude.toFixed(4))
   url.searchParams.set('hourly', 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m')
   url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max')
-  url.searchParams.set('timezone', 'Europe/Berlin')
+  url.searchParams.set('timezone', 'auto')
   url.searchParams.set('timeformat', 'unixtime')
   url.searchParams.set('forecast_days', '7')
   url.searchParams.set('forecast_hours', '24')
@@ -406,11 +407,34 @@ async function getForecast(latitude, longitude) {
   return data
 }
 
-createServer(async (request, response) => {
-  response.setHeader('Access-Control-Allow-Origin', '*')
-
+let activeRequests = 0
+let requestWindow = { startedAt: Date.now(), count: 0 }
+const server = createServer(async (request, response) => {
   const requestUrl = new URL(request.url, 'http://localhost')
   const pathname = requestUrl.pathname
+
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    response.writeHead(405, { Allow: 'GET, HEAD', 'Content-Type': 'application/json' })
+    response.end(JSON.stringify({ error: 'Methode nicht erlaubt.' }))
+    return
+  }
+  if (pathname === '/api/health') {
+    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+    response.end(JSON.stringify({ status: 'ok', uptimeSeconds: Math.floor(process.uptime()) }))
+    return
+  }
+  // A single-process beta deployment shares upstream caches and these global limits.
+  if (Date.now() - requestWindow.startedAt >= 60000) {
+    requestWindow = { startedAt: Date.now(), count: 0 }
+  }
+  if (activeRequests >= 32 || requestWindow.count >= 1200) {
+    response.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' })
+    response.end(JSON.stringify({ error: 'Zu viele Anfragen. Bitte später erneut versuchen.' }))
+    return
+  }
+  requestWindow.count++
+  activeRequests++
+  response.once('close', () => { activeRequests-- })
 
   if (pathname === '/api/locations/search') {
     const query = requestUrl.searchParams.get('q')?.trim() ?? ''
@@ -420,52 +444,14 @@ createServer(async (request, response) => {
       return
     }
     try {
-      if (/^\d{5}$/.test(query)) {
-        const upstream = await fetch(`https://api.zippopotam.us/de/${query}`, {
-          signal: AbortSignal.timeout(15000),
-        })
-        if (!upstream.ok && upstream.status !== 404) throw new Error(`PLZ-Suche antwortete mit HTTP ${upstream.status}.`)
-        const data = upstream.status === 404 ? null : await upstream.json()
-        const results = (data?.places ?? []).map((place, index) => ({
-          id: `${query}-${index}`,
-          name: `${place['place name']} (${query})`,
-          region: place.state ?? '',
-          country: 'Deutschland',
-          latitude: Number(place.latitude),
-          longitude: Number(place.longitude),
-        }))
-        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-        response.end(JSON.stringify({ results }))
-        return
-      }
-      const url = new URL('https://geocoding-api.open-meteo.com/v1/search')
-      url.searchParams.set('name', query)
-      url.searchParams.set('count', '8')
-      url.searchParams.set('language', 'de')
-      url.searchParams.set('format', 'json')
-      const countries = ['DE', 'AT', 'CH']
-      const responses = await Promise.all(countries.map(async (country) => {
-        const countryUrl = new URL(url)
-        countryUrl.searchParams.set('countryCode', country)
-        const upstream = await fetch(countryUrl, { signal: AbortSignal.timeout(15000) })
-        if (!upstream.ok) throw new Error(`Ortssuche antwortete mit HTTP ${upstream.status}.`)
-        const data = await upstream.json()
-        return (data.results ?? []).filter((place) => place.country_code === country)
-      }))
-      const results = responses.flat()
-        .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
-        .slice(0, 8).map((place) => ({
-        id: place.id,
-        name: place.name,
-        region: place.admin1 ?? '',
-        country: place.country ?? '',
-        latitude: place.latitude,
-        longitude: place.longitude,
-      }))
+      const results = await searchLocations(query,
+        requestUrl.searchParams.get('country') ?? 'DE',
+        requestUrl.searchParams.get('language') ?? 'de')
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
       response.end(JSON.stringify({ results }))
     } catch (error) {
-      response.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' })
+      console.warn('Ortssuche fehlgeschlagen:', error.message)
+      response.writeHead(error.status ?? 502, { 'Content-Type': 'application/json; charset=utf-8' })
       response.end(JSON.stringify({ error: 'Ortssuche konnte nicht geladen werden.', detail: error.message }))
     }
     return
@@ -550,7 +536,7 @@ createServer(async (request, response) => {
     }))
   }
 }).listen(PORT, () => {
-  console.log(`DWD-BFF läuft unter http://localhost:${PORT}`)
+  console.log(`DWD-BFF läuft unter http://localhost:${server.address().port}`)
   // The EUMETSAT capabilities take several seconds, so keep the frame list warm.
   const warmUp = () => {
     for (const load of [getSatelliteFrames]) {
@@ -560,3 +546,21 @@ createServer(async (request, response) => {
   warmUp()
   setInterval(warmUp, CACHE_TTL + 1000).unref()
 })
+
+server.requestTimeout = 30000
+server.headersTimeout = 15000
+server.keepAliveTimeout = 5000
+
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.once(signal, () => {
+    console.log(`${signal}: API wird beendet.`)
+    server.close((error) => {
+      if (error) console.error('API konnte nicht sauber beendet werden:', error)
+      process.exit(error ? 1 : 0)
+    })
+    setTimeout(() => {
+      console.error('API-Abschaltung nach 30 Sekunden erzwungen.')
+      process.exit(1)
+    }, 30000).unref()
+  })
+}

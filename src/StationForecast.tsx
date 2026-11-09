@@ -139,7 +139,9 @@ export function StationForecast({ latitude, longitude }: Props) {
           })}
         </ul>
       )}
-      <small className="forecast-source">{t('Quelle', 'Source')}: Open-Meteo, DWD ICON · {t('Zeit', 'Time')}: {timeZone} · {t('– = keine Daten', '– = no data')}</small>
+      <small className="forecast-source">{t('Quelle', 'Source')}: <a href="https://open-meteo.com/">Open-Meteo</a>, DWD ICON
+        {' · '}<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+        {' · '}{t('Zeit', 'Time')}: {timeZone} · {t('– = keine Daten', '– = no data')}</small>
     </div>
   )
 }

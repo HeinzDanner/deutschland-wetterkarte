@@ -8,7 +8,16 @@
 }
 
 .ol-attribution {
-  font-size: 10px;
+  font-size: 11px;
+  max-width: calc(100% - 12px);
+}
+
+.ol-attribution ul {
+  white-space: normal;
+}
+
+.ol-attribution a {
+  color: #00334f;
 }
 
 /* Screen blending only brightens, so dark IR areas no longer dim the base map. */

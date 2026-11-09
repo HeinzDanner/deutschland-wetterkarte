@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Feature from 'ol/Feature'
 import Map from 'ol/Map'
 import View from 'ol/View'
@@ -19,10 +19,13 @@ import germanyRings from './data/germany.json'
 import { getRadarFrames, getSatelliteFrames, getStations, type WeatherStation } from './stations'
 import { createRadarBuffer } from './radarBuffer'
 import { StationForecast } from './StationForecast'
-import { OperaRadar } from './OperaRadar'
+import { OperaRadar, type RadarStatus } from './OperaRadar'
+import { commonFrameTimes } from './synchronizedTimeline'
+import { retainedRadarIndex } from './radarTimeline'
 import { WeatherWarnings } from './WeatherWarnings'
 import { LocationSearch, type ForecastLocation } from './LocationSearch'
 import { useLanguage } from './i18n'
+import { LegalPages } from './LegalPages'
 import { DEFAULT_VIEW, DEFAULT_LAYERS, MAP_VIEW_KEY, MAP_LAYERS_KEY, readPreference, savePreference, validView, validLayers } from './mapPreferences'
 import './map.css'
 
@@ -107,6 +110,40 @@ function App() {
   const [forecastLocation, setForecastLocation] = useState<ForecastLocation | null>(null)
   const [forecastIsMapPoint, setForecastIsMapPoint] = useState(false)
   const [mapReady, setMapReady] = useState(false)
+  const [synchronized, setSynchronized] = useState(false)
+  const [syncPlaying, setSyncPlaying] = useState(false)
+  const [syncSelected, setSyncSelected] = useState<string | null>(null)
+  const [operaFrames, setOperaFrames] = useState<string[]>([])
+  const [operaStatus, setOperaStatus] = useState<RadarStatus>({ time: null, ready: false, error: false })
+  const commonTimes = useMemo(() => commonFrameTimes(operaFrames, satelliteFrames), [operaFrames, satelliteFrames])
+  const syncIndex = commonTimes.length ? retainedRadarIndex(commonTimes, syncSelected ?? undefined) : -1
+  const syncTime = commonTimes[syncIndex] ?? null
+  const syncActive = synchronized && operaVisible && satelliteVisible
+
+  useEffect(() => {
+    if (!operaVisible || !satelliteVisible) {
+      setSynchronized(false)
+      setSyncPlaying(false)
+    }
+  }, [operaVisible, satelliteVisible])
+
+  useEffect(() => {
+    if (syncTime) setSyncSelected(syncTime)
+  }, [syncTime])
+
+  useEffect(() => {
+    if (syncActive) setSatellitePlaying(false)
+  }, [syncActive])
+
+  const syncReady = !!syncTime && operaStatus.ready && Date.parse(operaStatus.time ?? '') === Date.parse(syncTime) &&
+    !satelliteImageLoading && Date.parse(displayedSatelliteTime ?? '') === Date.parse(syncTime)
+  const syncError = operaStatus.error || !!satelliteError || !!satelliteImageError
+  useEffect(() => {
+    if (syncError) setSyncPlaying(false)
+    if (!syncActive || !syncPlaying || !syncReady || syncError || commonTimes.length < 2) return
+    const timer = window.setTimeout(() => setSyncSelected(commonTimes[(syncIndex + 1) % commonTimes.length]), 500)
+    return () => window.clearTimeout(timer)
+  }, [syncActive, syncPlaying, syncReady, syncError, commonTimes, syncIndex])
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
   const [mobileDetail, setMobileDetail] = useState<{ selector: string } | null>(null)
   const panelElement = useRef<HTMLElement>(null)
@@ -162,7 +199,8 @@ function App() {
     const baseLayer = new TileLayer({
       source: new XYZ({
         url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        attributions: '&copy; OpenStreetMap contributors',
+        attributions: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+        attributionsCollapsible: false,
       }),
     })
     satelliteLayer.current = new ImageLayer({
@@ -354,12 +392,17 @@ function App() {
     }
   }, [satelliteVisible, radarViewport, satelliteReload])
 
-  const satelliteTime = satelliteFrames[satelliteFrameIndex]
+  const satelliteTime = syncActive
+    ? satelliteFrames.find((frame) => Date.parse(frame) === Date.parse(syncTime ?? ''))
+    : satelliteFrames[satelliteFrameIndex]
 
   useEffect(() => {
     const layer = satelliteLayer.current
     const buffer = satelliteBuffer.current
-    if (!satelliteVisible || !satelliteTime || !buffer || !layer) return
+    if (!satelliteVisible || !satelliteTime || !buffer || !layer) {
+      if (syncActive) layer?.setVisible(false)
+      return
+    }
     buffer.retain(satelliteFrames)
     setSatelliteImageLoading(true)
     setSatelliteImageError(null)
@@ -390,14 +433,14 @@ function App() {
     return () => {
       active = false
     }
-  }, [satelliteFrames, satelliteFrameIndex, satelliteTime, satelliteVisible, radarViewport, satelliteReload])
+  }, [satelliteFrames, satelliteFrameIndex, satelliteTime, satelliteVisible, radarViewport, satelliteReload, syncActive])
 
   useEffect(() => {
     if (!satelliteVisible) satelliteLayer.current?.setVisible(false)
   }, [satelliteVisible])
 
   useEffect(() => {
-    if (!satellitePlaying || satelliteFrames.length < 2 || satelliteImageLoading ||
+    if (syncActive || !satellitePlaying || satelliteFrames.length < 2 || satelliteImageLoading ||
       satelliteImageError || displayedSatelliteTime !== satelliteTime) return
 
     const timeout = window.setTimeout(() => {
@@ -405,7 +448,7 @@ function App() {
     }, 200)
     return () => window.clearTimeout(timeout)
   }, [satellitePlaying, satelliteFrames, satelliteImageLoading, satelliteImageError,
-    displayedSatelliteTime, satelliteTime])
+    displayedSatelliteTime, satelliteTime, syncActive])
 
   useEffect(() => {
     if (satelliteFrameIndex === satelliteFrames.length - 1) setSatellitePlaying(false)
@@ -629,6 +672,10 @@ function App() {
             })
           }}>{t('Kartenansicht zurücksetzen', 'Reset map view')}</button>
           <OperaRadar
+            synchronized={syncActive}
+            synchronizedTime={syncTime}
+            onFrames={setOperaFrames}
+            onStatus={setOperaStatus}
             map={mapReady ? map.current : null}
             active={operaVisible}
             onChange={(active) => {
@@ -793,7 +840,8 @@ function App() {
               </span>
             </label>
             {satelliteVisible && (
-              <div className="radar-timeline">
+              <details className="radar-timeline" open={!syncActive}>
+                <summary hidden={!syncActive}>{t('Satelliten-Details und Deckkraft', 'Satellite details and opacity')}</summary>
                 <div className="radar-time-heading">
                   <span>{t('Aufnahme', 'Image')}</span>
                   {satelliteTime ? (
@@ -809,7 +857,7 @@ function App() {
                     <span>{satelliteError ? t('Nicht verfügbar', 'Unavailable') : t('Lade …', 'Loading …')}</span>
                   )}
                 </div>
-                {satelliteFrames.length > 0 && (
+                {satelliteFrames.length > 0 && !syncActive && (
                   <>
                     <input
                       aria-label={t('Satellitenzeitpunkt auswählen', 'Select satellite time')}
@@ -905,8 +953,56 @@ function App() {
                     'Bright areas are cold, high clouds; dark areas are ground or low clouds. The images are about an hour old.',
                   )}
                 </small>
-              </div>
+              </details>
             )}
+          </div>
+          <div className="layer-group">
+            <label className="layer-toggle">
+              <input type="checkbox" checked={syncActive} onChange={(event) => {
+                setSynchronized(event.target.checked)
+                setSyncPlaying(false)
+                if (event.target.checked) {
+                  setOperaVisible(true)
+                  setRadarVisible(false)
+                  setSatelliteVisible(true)
+                  setSyncSelected(null)
+                }
+              }} />
+              <span className="toggle-track" />
+              <span><strong>{t('Radar & Satellit synchron', 'Synchronize radar & satellite')}</strong>
+                <small>{t('Gemeinsame Aufnahmezeitpunkte abspielen', 'Play matching image times')}</small></span>
+            </label>
+            {syncActive && <div className="radar-timeline">
+              <p className="radar-range-note">{t('Nur gemeinsame Aufnahmezeiten; wegen der Satellitenverzögerung endet die Wiedergabe ggf. früher als das aktuelle Radar.', 'Only matching image times; satellite delays may make playback end earlier than the latest radar.')}</p>
+              {syncTime ? <>
+                <time dateTime={syncTime}>{new Intl.DateTimeFormat(locale, {
+                  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin',
+                }).format(new Date(syncTime))}</time>
+                <input type="range" className="radar-slider" aria-label={t('Gemeinsamen Zeitpunkt auswählen', 'Select synchronized time')}
+                  min={0} max={commonTimes.length - 1} value={syncIndex} onChange={(event) => {
+                    setSyncPlaying(false); setSyncSelected(commonTimes[Number(event.target.value)])
+                  }} />
+                <div className="radar-controls">
+                  <button type="button" disabled={syncIndex === 0} onClick={() => {
+                    setSyncPlaying(false); setSyncSelected(commonTimes[syncIndex - 1])
+                  }}>{t('Zurück', 'Previous')}</button>
+                  <button type="button" disabled={commonTimes.length < 2 || syncError} onClick={() => {
+                    if (!syncPlaying && syncIndex === commonTimes.length - 1) setSyncSelected(commonTimes[0])
+                    setSyncPlaying(!syncPlaying)
+                  }}>{syncPlaying ? t('Pause', 'Pause') : t('Abspielen', 'Play')}</button>
+                  <button type="button" disabled={syncIndex === commonTimes.length - 1} onClick={() => {
+                    setSyncPlaying(false); setSyncSelected(commonTimes[syncIndex + 1])
+                  }}>{t('Vor', 'Next')}</button>
+                  <button type="button" onClick={() => {
+                    setSyncPlaying(false); setSyncSelected(commonTimes[commonTimes.length - 1])
+                  }}>{t('Neuestes gemeinsam', 'Latest matching')}</button>
+                </div>
+                <p className="radar-range-note" role="status">{syncError
+                  ? t('Gemeinsame Wiedergabe wegen eines Ladefehlers pausiert. Betroffenen Layer erneut laden.', 'Synchronized playback paused after a loading error. Reload the affected layer.')
+                  : syncReady ? t('Beide Bilder geladen.', 'Both images loaded.')
+                    : t('Warte auf beide Bilder …', 'Waiting for both images …')}</p>
+              </> : <p role="status">{t('Keine gemeinsamen Zeitpunkte verfügbar. Beide Zeitlisten müssen erfolgreich geladen sein.', 'No matching times available. Both timelines must load successfully.')}</p>}
+            </div>}
           </div>
           {forecastLocation && (
             <section className="station-card" aria-label={t('Ortsvorhersage', 'Location forecast')}>
@@ -1005,17 +1101,6 @@ function App() {
           </div>
           <WeatherWarnings map={mapReady ? map.current : null} visible={warningsVisible} onChange={setWarningsVisible}
             onDetails={() => revealMobileDetails('.warning-card')} />
-          <div className="layer-group layer-group-muted">
-            <p className="layer-group-title">{t('In Vorbereitung', 'Coming soon')}</p>
-            <div className="layer-placeholder">
-              <span className="placeholder-icon">↗</span>
-              <span>
-                <strong>{t('Hoch- und Tiefdruck', 'High and low pressure')}</strong>
-                <small>{t('Großwetterlage · später', 'Synoptic situation · planned')}</small>
-              </span>
-              <span className="planned-badge">V1.1</span>
-            </div>
-          </div>
           <div className="info-box">
             <strong>{t('Hinweis', 'Note')}</strong>
             <p>
@@ -1029,6 +1114,7 @@ function App() {
         <div ref={mapElement} className="map" aria-label={t('Wetterkarte Europa', 'Europe weather map')} />
       </section>
       <footer>
+        <LegalPages />
         {t(
           'Datenquellen: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Kartenbasis: OpenStreetMap',
           'Data sources: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Map base: OpenStreetMap',

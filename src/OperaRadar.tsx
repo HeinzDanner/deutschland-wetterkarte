@@ -18,8 +18,13 @@ type Props = {
   map: OlMap | null
   active: boolean
   onChange: (active: boolean) => void
+  synchronized: boolean
+  synchronizedTime: string | null
+  onFrames: (frames: string[]) => void
+  onStatus: (status: RadarStatus) => void
 }
 
+export type RadarStatus = { time: string | null; ready: boolean; error: boolean }
 async function checkedFetch(url: string, signal: AbortSignal) {
   const response = await fetch(url, { signal })
   if (!response.ok) {
@@ -92,7 +97,7 @@ function createBuffer(onReady: (time: string) => void) {
   }
 }
 
-export function OperaRadar({ map, active, onChange }: Props) {
+export function OperaRadar({ map, active, onChange, synchronized, synchronizedTime, onFrames, onStatus }: Props) {
   const { t, locale } = useLanguage()
   const timeFormat = new Intl.DateTimeFormat(locale, {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -112,7 +117,21 @@ export function OperaRadar({ map, active, onChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [displayed, setDisplayed] = useState<string | null>(null)
-  const time = data?.frames[index]
+  const time = synchronized
+    ? data?.frames.find((frame) => Date.parse(frame) === Date.parse(synchronizedTime ?? ''))
+    : data?.frames[index]
+
+  useEffect(() => {
+    onFrames(active ? data?.frames ?? [] : [])
+  }, [data, active, onFrames])
+
+  useEffect(() => {
+    onStatus({ time: displayed, ready: active && !loading && displayed === time && !!time, error: !!error })
+  }, [active, loading, displayed, time, error, onStatus])
+
+  useEffect(() => {
+    if (synchronized) setPlaying(false)
+  }, [synchronized])
 
   useEffect(() => {
     if (!active || !map) return
@@ -169,7 +188,10 @@ export function OperaRadar({ map, active, onChange }: Props) {
   useEffect(() => {
     const images = buffer.current
     const overlay = layer.current
-    if (!active || !time || !images || !overlay) return
+    if (!active || !time || !images || !overlay) {
+      if (synchronized) overlay?.setVisible(false)
+      return
+    }
     let current = true
     setLoading(true)
     setError(null)
@@ -187,7 +209,7 @@ export function OperaRadar({ map, active, onChange }: Props) {
       setError(reason instanceof Error ? reason.message : 'OPERA-Radarbild konnte nicht geladen werden.')
     })
     return () => { current = false }
-  }, [active, map, time, data, reload])
+  }, [active, map, time, data, reload, synchronized])
 
   useEffect(() => {
     layer.current?.getSource()?.setAttributions(
@@ -225,10 +247,10 @@ export function OperaRadar({ map, active, onChange }: Props) {
   }, [active, map, data, reload])
 
   useEffect(() => {
-    if (!playing || !data || data.frames.length < 2 || loading || displayed !== time) return
+    if (synchronized || !playing || !data || data.frames.length < 2 || loading || displayed !== time) return
     const timer = window.setTimeout(() => setIndex((i) => (i + 1) % data.frames.length), 500)
     return () => window.clearTimeout(timer)
-  }, [playing, data, loading, displayed, time])
+  }, [playing, data, loading, displayed, time, synchronized])
 
   return (
     <div className="layer-group">
@@ -242,7 +264,8 @@ export function OperaRadar({ map, active, onChange }: Props) {
         </span>
       </label>
       {active && (
-        <div className="radar-timeline">
+        <details className="radar-timeline" open={!synchronized}>
+          <summary hidden={!synchronized}>{t('Radar-Details und Neuladen', 'Radar details and reload')}</summary>
           <div className="radar-time-heading">
             <span>{t('Angezeigtes Bild', 'Displayed image')}</span>
             {displayed ? <time dateTime={displayed}>{timeFormat.format(new Date(displayed))}</time>
@@ -250,7 +273,7 @@ export function OperaRadar({ map, active, onChange }: Props) {
           </div>
           {data && (
             <>
-              <input
+              {!synchronized && <><input
                 aria-label={t('Europäischen Radarzeitpunkt auswählen', 'Select European radar time')}
                 className="radar-slider"
                 type="range" min={0} max={data.frames.length - 1} value={index}
@@ -266,7 +289,7 @@ export function OperaRadar({ map, active, onChange }: Props) {
                   setPlaying(false); setIndex(index + 1)
                 }}>+15</button>
                 <button type="button" onClick={() => { setPlaying(false); setIndex(data.frames.length - 1) }}>{t('Neuestes', 'Latest')}</button>
-              </div>
+              </div></>}
               <p className="radar-range-note" role="status">
                 {t('Bilder vorgeladen', 'Images preloaded')}: {data.frames.filter((frame) => readyFrames.includes(frame)).length} / {data.frames.length}
               </p>
@@ -304,7 +327,7 @@ export function OperaRadar({ map, active, onChange }: Props) {
               {t('Farben, Transparenz und Projektion bearbeitet.', 'Colours, transparency and projection modified.')}
             </p>
           </details>
-        </div>
+        </details>
       )}
     </div>
   )

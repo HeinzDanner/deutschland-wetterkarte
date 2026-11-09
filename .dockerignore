@@ -1,0 +1,17 @@
+**
+!package.json
+!package-lock.json
+!index.html
+!vite.config.ts
+!tsconfig*.json
+!src/
+!src/**
+!scripts/
+!scripts/third-party-notices.mjs
+!server.mjs
+!opera.mjs
+!warnings.mjs
+!station-history.mjs
+!location-search.mjs
+!deploy/
+!deploy/Caddyfile
