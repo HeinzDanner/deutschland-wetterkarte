@@ -1111,6 +1111,10 @@ function App() {
                 'Yellow, dashed circles group multiple stations and show their average temperature (Ø). Click or zoom in to see individual readings. Data is refreshed every five minutes.',
               )}
             </p>
+            <p className="station-help">
+              <a href="https://www.dwd.de/">{t('Quelle: Deutscher Wetterdienst', 'Source: Deutscher Wetterdienst')}</a>.
+              {' '}{t('Datenbasis: Deutscher Wetterdienst, Einzelwerte in Clustern gemittelt.', 'Data source: Deutscher Wetterdienst, individual values averaged in clusters.')}
+            </p>
           </div>
           <WeatherWarnings map={mapReady ? map.current : null} visible={warningsVisible} onChange={setWarningsVisible}
             onDetails={() => revealMobileDetails('.warning-card')} />

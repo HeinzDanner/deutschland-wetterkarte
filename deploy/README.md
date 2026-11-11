@@ -159,6 +159,17 @@ neue Historie.
   AV-Vertrag abgeschlossen; Vertragsgesellschaft, tatsaechliche Logs und
   Loeschfristen noch anhand des konkreten Betriebs pruefen.
   Entwurfshinweise in `src/LegalPages.tsx` erst nach inhaltlicher Pruefung entfernen.
+- Betreiberangaben und Rechtstexte nach Entwurf eingefuegt; rechtliche Pruefung
+  bleibt offen. Impressum und Datenschutz verwenden dieselbe oeffentliche
+  c/o-Anschrift aus `src/legalConfig.ts` in beiden Sprachen. Die c/o-Anschrift
+  bestimmt nicht automatisch die zustaendige Datenschutzaufsichtsbehoerde.
+  Nach dem ersten Produktionsstart mit `docker compose logs --tail=200 api`
+  oder `docker logs` pruefen, ob IP-Adressen in Backend-Logs auftauchen;
+  gegebenenfalls Abschnitt 3 der Datenschutzerklaerung ergaenzen.
+  Fehlende IP-Adressen in einer Stichprobe beweisen nicht, dass sie bei
+  anderen Anfragen oder Fehlern niemals protokolliert werden.
+  Nach Adressaenderungen neu bauen und deployen: alte Images, Quellarchive
+  und Git-Historie werden dadurch nicht rueckwirkend bereinigt.
 - `npm run notices` erzeugt `public/third-party-notices.txt` aus den installierten
   Produktionsabhaengigkeiten; `npm run build` fuehrt dies automatisch aus.
   Fehlende Lizenztexte brechen die Erzeugung ab und muessen geprueft werden.
