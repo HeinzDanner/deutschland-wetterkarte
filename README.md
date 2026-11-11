@@ -6,7 +6,7 @@ Eine Full-Stack-Webanwendung mit React, TypeScript und OpenLayers sowie einem sc
 
 Der technische Schwerpunkt liegt nicht nur auf der Visualisierung: Die Anwendung verarbeitet GeoTIFF-Radardaten zu PNGs, koordiniert asynchrone Bildabrufe und führt Warngeometrien zusammen, ohne deren ursprüngliche lokale Informationen zu verlieren.
 
-**Status:** funktionsfähige Entwicklungsversion mit vorbereiteter Container-Bereitstellung. Eine öffentlich betriebene Demo ist hier noch nicht verlinkt. Rechtliche und betriebliche Freigabepunkte sind offen; das Projekt beansprucht keine Produktionsfreigabe.
+**Erste Veröffentlichung:** Anwendungscode unter **AGPL-3.0-or-later**, mit Docker Compose und Caddy selbst betreibbar. Die Bereitstellung ist für `smartcontentstudio.de` vorgesehen; ein erfolgreicher Livebetrieb wird hier erst nach dem tatsächlichen Start bestätigt.
 
 [Einblicke](#einblicke) · [Funktionen](#funktionen) · [Architektur](#architektur) · [Lokal starten](#lokal-starten) · [Tests](#tests-und-qualitätsprüfung) · [Deployment](#deployment) · [Lizenzen](#datenquellen-und-lizenzen)
 
@@ -24,7 +24,7 @@ Der technische Schwerpunkt liegt nicht nur auf der Visualisierung: Die Anwendung
 
 *Gemeinsame verfügbare Zeitpunkte statt eines Vergleichs unterschiedlich alter Bilder.*
 
-<sub>Karte: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), ODbL. Radar: [EUMETNET OPERA](https://eumetnet.github.io/openradardata-documentation/1-ORD-API-overview/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), farblich aufbereitet und reprojiziert. Satellit: EUMETSAT Meteosat, Kontrast/Helligkeit und Überblendung angepasst. Stationswerte/Warnflächen: DWD.</sub>
+<sub>Karte: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), ODbL. Radar: [EUMETNET OPERA](https://eumetnet.github.io/openradardata-documentation/1-ORD-API-overview/), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), farblich aufbereitet und reprojiziert. Satellit: [EUMETSAT Meteosat / EUMETView](https://view.eumetsat.int/), msg_fes:ir108, Datenstand 2026, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); Kontrast/Helligkeit und Überblendung angepasst. Stationswerte/Warnflächen: DWD.</sub>
 
 ### Warngebiete mit lokalem Kontext
 
@@ -36,8 +36,8 @@ Der technische Schwerpunkt liegt nicht nur auf der Visualisierung: Die Anwendung
 
 Die Aufnahmen vom **9. November 2026** zeigen den damaligen Datenstand, keine
 aktuelle Wetterlage. Die Quellenhinweise gelten jeweils für die dargestellten
-Daten; vor öffentlicher Veröffentlichung sind insbesondere die noch offenen
-EUMETSAT-Bildnutzungsbedingungen zu klären (siehe [Datenquellen und Lizenzen](#datenquellen-und-lizenzen)).
+Daten. Die bestätigte EUMETSAT-Datenlizenz und davon getrennte offene
+Dienstbedingungen sind unter [Datenquellen und Lizenzen](#datenquellen-und-lizenzen) beschrieben.
 
 ## Funktionen
 
@@ -47,7 +47,7 @@ EUMETSAT-Bildnutzungsbedingungen zu klären (siehe [Datenquellen und Lizenzen](#
 | **Satellit** | EUMETSAT-Meteosat-Infrarotbilder mit Zeitleiste und einstellbarer Deckkraft. |
 | **Gemeinsame Wiedergabe** | Radar und Satellit anhand tatsächlich gemeinsamer Zeitpunkte abspielen; die nächste Wiedergabestufe wartet auf beide Bilder. |
 | **Stationsnetz** | 100 ausgewählte deutsche DWD-Stationen mit Temperatur, Luftfeuchte und Wind; Cluster mit Durchschnittstemperatur und Zoom zu Einzelstationen. |
-| **Amtliche Warnungen** | DWD-Warnflächen mit Schraffur, Schweregrad und Beschriftung; Originaltexte, Gültigkeit und lokale Zuordnung per Klick. Die Warnabdeckung ist Deutschland, nicht ganz Europa. |
+| **Wetterwarnungen** | Eigene Darstellung auf Basis von DWD-Warnungen mit Schraffur, Schweregrad und Beschriftung; Originaltexte, Gültigkeit und lokale Zuordnung per Klick. Kein amtlicher Warnkanal. Die Warnabdeckung ist Deutschland, nicht ganz Europa. |
 | **Ortssuche** | Europäische Länderauswahl mit Deutschland als Vorauswahl, Ortsnamen sowie deutsche Postleitzahlen. Treffer zeigen Region und Land. |
 | **Punktvorhersage** | 24-Stunden-Verlauf und Sieben-Tage-Ausblick für Suchtreffer, Stationen oder Kartenklicks über Open-Meteo/DWD ICON, mit lokaler Zeitzone. Verfügbarkeit abhängig vom Datenanbieter. |
 | **Bedienung** | Deutsche und englische Oberfläche, responsive Kartenansicht, einklappbare mobile Bedienelemente und optional gespeicherte Karteneinstellungen. |
@@ -141,7 +141,8 @@ Die Docker-Umgebungsdatei wird für diesen lokalen Start nicht benötigt. Eine a
 | `npm run api` / `npm start` | Node.js-Backend starten. |
 | `npm run dev` | Vite-Entwicklungsserver mit API-Proxy starten. |
 | `npm test` | Automatisierte Tests ausführen. |
-| `npm run build` | Software-Lizenzhinweise erzeugen, TypeScript prüfen und Frontend nach `dist` bauen. |
+| `npm run build` | Lizenzhinweise und Quellcode-Download erzeugen, TypeScript prüfen und Frontend nach `dist` bauen. |
+| `npm run source-release` | AGPL-Lizenztext und Quellcodearchiv für die ausgelieferte Version erzeugen; benötigt `tar`. |
 | `npm run notices` | `public/third-party-notices.txt` aus den installierten Produktionsabhängigkeiten aktualisieren. |
 | `npm run preview` | Gebautes Frontend lokal ansehen; kein vollständiger Produktionsstart und kein Ersatz für das API-Routing. |
 
@@ -198,6 +199,7 @@ src/
   i18n.tsx                   Sprachumschaltung
   LegalPages.tsx             Quellen, Wetterhinweise und Rechtstext-Entwürfe
   legalConfig.ts             Öffentliche Betreiberangaben und offene Betriebsdetails
+  satelliteAttribution.ts    EUMETView-Quelle, Lizenzlinks und metadatenbasiertes Datenjahr
 server.mjs                   HTTP-API, Datenabrufe und prozesslokale Caches
 opera.mjs                    GeoTIFF-zu-PNG-Pipeline und Request-Coalescing
 warnings.mjs                 Abruf und Normalisierung der DWD-Warnungen
@@ -206,6 +208,8 @@ station-history.mjs          Persistente Stations-Ausfallhistorie
 *.test.mjs                   Automatisierte Tests
 scripts/third-party-notices.mjs
                              Sammlung der Software-Lizenzhinweise
+scripts/source-release.mjs   Quellcodearchiv und AGPL-Lizenzdownload für den Build
+LICENSE                      Vollständiger AGPL-v3-Lizenztext (Nutzung: Version 3 oder später)
 deploy/                      Caddy-Konfiguration und Betriebsanleitung
 Dockerfile / compose.yaml    Container-Build und Ein-Instanz-Betrieb
 ```
@@ -216,7 +220,7 @@ Die vorbereitete Serverarchitektur nutzt Caddy für statische Dateien, HTTPS und
 
 **Ein API-Replikat betreiben:** Caches, Anfragegrenzen und die JSON-Historie sind nicht zwischen Instanzen koordiniert. Der globale Schutz von 32 gleichzeitigen Anfragen und 1.200 Anfragen pro Minute ersetzt weder nutzerbezogene Limits noch DDoS-Schutz.
 
-Voraussetzungen, Domain-Konfiguration, Start, Updates und Sicherung sind in der **[Deployment-Anleitung](deploy/README.md)** beschrieben. Container-Build, HTTPS und Wiederherstellung müssen auf dem konkreten Zielsystem noch praktisch abgenommen werden.
+Voraussetzungen, Domain-Konfiguration, Start, Updates und Sicherung sind in der **[Deployment-Anleitung](deploy/README.md)** beschrieben. Für öffentlichen Betrieb wird die Standarddatei `compose.yaml` verwendet; `compose.private.yaml` ist nur eine optionale Ergänzung für passwortgeschützte Tests. Nach dem Start HTTPS, Datenabrufe und Wiederherstellung auf dem Zielsystem prüfen.
 
 ## Datenquellen und Lizenzen
 
@@ -224,7 +228,7 @@ Voraussetzungen, Domain-Konfiguration, Start, Updates und Sicherung sind in der 
 | --- | --- |
 | [EUMETNET OPERA / NIMBUS](https://eumetnet.github.io/openradardata-documentation/1-ORD-API-overview/) | Radar-Komposit, CC BY 4.0; Quellen-, Lizenz- und Bearbeitungshinweise in der Anwendung. |
 | [Deutscher Wetterdienst](https://www.dwd.de/DE/service/rechtliche_hinweise/rechtliche_hinweise.html) | Beobachtungen und Warnungen; produktbezogene Vorgaben abschließend prüfen. |
-| [EUMETSAT](https://www.eumetsat.int/) | Meteosat-Infrarot über WMS; konkrete Bedingungen des verwendeten Angebots noch zu klären. |
+| [EUMETSAT / EUMETView](https://view.eumetsat.int/) | Meteosat-Infrarot, Layer `msg_fes:ir108`, WMS `https://view.eumetsat.int/geoserver/ows`; [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Datenlizenz durch EUMETSAT Legal Affairs am 11.11.2026 bestätigt; technische Dienstbedingungen getrennt prüfen. |
 | [Open-Meteo](https://open-meteo.com/en/terms) | Vorhersage und Geocoding. Daten unter CC BY 4.0; kostenlose API nur für nichtkommerzielle Nutzung. Eine beruflich werbliche Portfolio-Nutzung ist nicht automatisch als nichtkommerziell anzunehmen. |
 | [GeoNames](https://www.geonames.org/export/) | Ortsdaten über Open-Meteo; Attribution beachten. |
 | [Zippopotam.us](https://docs.zippopotam.us/docs/getting-started/) | Deutsche Postleitzahlen auf Basis von GeoNames; genaue Dienstbedingungen noch abschließend prüfen. |
@@ -232,7 +236,43 @@ Voraussetzungen, Domain-Konfiguration, Start, Updates und Sicherung sind in der 
 
 Die **[Software-Lizenzhinweise](public/third-party-notices.txt)** werden beim Build aus den installierten Produktionsabhängigkeiten erzeugt. Sie ersetzen keine Prüfung der Wetter- und Geodatenlizenzen.
 
-**Eigener Anwendungscode:** Eine Veröffentlichungslizenz wurde noch nicht ausgewählt. Bis dahin wird hier keine allgemeine Erlaubnis zur Weiterverwendung des eigenen Codes erteilt. Daten- und Drittanbieter-Softwarelizenzen gelten unabhängig davon.
+**EUMETSAT-Bestätigung:** EUMETSAT Legal Affairs hat am 11.11.2026 bestätigt,
+dass über EUMETView verfügbare Daten einschließlich `msg_fes:ir108` unter
+CC BY 4.0 genutzt werden können. Frontend-Bildabruf und Backend-Zeitmetadaten
+verwenden genau diesen Layer; die Abrufe wurden nicht geändert. Die Angaben
+für Kartenattribution und Quellen-Seite stehen zentral in
+`src/satelliteAttribution.ts`. Das Datenjahr wird aus dem UTC-Zeitstempel des
+tatsächlich geladenen Bildes abgeleitet, nicht aus dem Kalenderjahr.
+Ohne geladenes Bild nennt die Quellen-Seite das Jahr ausdrücklich als nicht
+bestimmt. Das Screenshot-Datenjahr oben bezieht sich auf den dokumentierten
+Aufnahmestand, nicht auf das heutige Datum.
+
+Eigene Darstellungsänderungen: CSS-Kontrast 1,9, Helligkeit 1,25 und einstellbare
+Deckkraft zur Überblendung im Screen-Mischmodus. Die meteorologischen Werte werden nicht neu
+berechnet. WMS-PNG8 und reduzierte Bildauflösung sind technische
+Darstellungsschritte. Die Bestätigung ist keine pauschale Website-Freigabe,
+keine Empfehlung oder Partnerschaft und keine Zusage unbegrenzter Zugriffe.
+Technische Dienstbedingungen, Limits, Caching-/Proxy-Vorgaben und Datenschutz
+direkter Browserverbindungen bleiben getrennt zu prüfen. Andere Quellen
+werden dadurch nicht freigegeben; die eigene Code-Lizenz bleibt unverändert.
+
+**Eigener Anwendungscode:** Copyright (C) 2026 Heinz Danner. Lizenz:
+[GNU Affero General Public License, Version 3 oder später](LICENSE)
+(`AGPL-3.0-or-later`). Es besteht keine Gewährleistung im Umfang der Lizenz.
+Wetter-/Kartendaten, Fremdinhalte in Screenshots und Drittanbieter-Software
+behalten ihre gesonderten Bedingungen; die AGPL erteilt keine zusätzlichen
+Rechte an diesen Inhalten.
+
+Unter „Quellen & Lizenzen“ bietet die Anwendung den Lizenztext und ein
+Quellcodearchiv der gebauten Version an. `npm run build` erzeugt diese Dateien
+automatisch; der Docker-Build nimmt auch Backend, Buildskripte und
+Bereitstellungskonfiguration auf. `.env`, private Schlüssel, lokale
+Stationshistorie und `node_modules` gehören nicht in das Archiv.
+Bei Änderungen oder Weiterbetrieb sind die AGPL-Pflichten zu beachten,
+insbesondere das Angebot des entsprechenden Quellcodes bei modifizierten,
+über ein Netzwerk genutzten Versionen. Das Angebot muss für Besucher
+tatsächlich erreichbar sein; ein privates GitHub-Repository allein genügt
+dafür nicht.
 
 ## Datenschutz und Grenzen
 
@@ -244,17 +284,21 @@ Impressum und Datenschutz sind über die Anwendung erreichbar, aber **ausdrückl
 
 Diese Karte ist **kein amtlicher Warnkanal oder Notfalldienst**. Daten können verspätet, unvollständig oder nicht verfügbar sein. Für sicherheitsrelevante Entscheidungen sind die amtlichen Originalwarnungen maßgeblich. Satelliten-Infrarot zeigt keine Regenintensität; transparente Radarbereiche garantieren keine Niederschlagsfreiheit.
 
-## Vor der öffentlichen Freigabe
+## Betriebshinweise
 
-- Den früher beobachteten Backend-Absturz bei einem Upstream-Timeout gezielt reproduzieren, beheben und mit Ausfalltests absichern.
-- Betreiber-/Kontaktangaben und die Erforderlichkeit weiterer Kontaktmöglichkeiten prüfen; Vertragsgesellschaft, tatsächliches Hosting, Logs und Löschfristen klären und Rechtstexte daran ausrichten.
-- Lokale Einstellungsspeicherung und direkte Drittanbieterabrufe datenschutzrechtlich bewerten und gegebenenfalls technisch anpassen.
-- Offene Datenbedingungen und die Herkunft/Lizenz der noch eingebundenen Deutschland-Geometrie für den deaktivierten Radar-Fallback klären.
-- Umsetzung der [DWD-Regeln für Quellenvermerke](https://www.wettergefahren.de/vorlagen_quellenangabe.html), ohne abschließende rechtliche Freigabe: Die bearbeitete Warnungsanzeige enthält keinen unmittelbaren Quellenvermerk, sondern einen sichtbaren Hinweis auf fehlende Vollständigkeits-/Aktualitätsgarantie und einen Link zu offiziellen Warnungen. Datenbasis und Bearbeitung sind zentral unter Quellen/Lizenzen und im Impressum dokumentiert. Stations-Quellenvermerke bleiben unverändert. Eine schriftliche Bestätigung kann optional über opendata@dwd.de angefragt werden.
-- Produktionsinstallation mit HTTPS, Last-/Ausfallverhalten, externer Alarmierung und tatsächlich erprobter Backup-Wiederherstellung abnehmen; Sicherheitsprüfung durchführen.
+Die App ist ein ergänzendes Informationsangebot ohne Verfügbarkeitszusage.
+Providerbedingungen, Kontingente und Datenschutz sind beim eigenen Betrieb
+zu berücksichtigen. Konkrete Betriebsprüfungen und noch ungeklärte Angaben
+werden in der [Deployment-Anleitung](deploy/README.md) geführt, nicht als
+erledigt vorausgesetzt.
 
-Diese offenen Punkte sind eine Startcheckliste, keine behauptete behördliche Genehmigungspflicht.
+Die [DWD-Regeln für Quellenvermerke](https://www.wettergefahren.de/vorlagen_quellenangabe.html)
+sind für die bearbeitete Warnungsdarstellung ohne abschließende rechtliche
+Freigabe umgesetzt: kein unmittelbarer Quellenvermerk, stattdessen sichtbarer
+Hinweis auf fehlende Vollständigkeits-/Aktualitätsgarantie und Link zu offiziellen
+Warnungen. Datenbasis und Bearbeitung sind zentral dokumentiert;
+Stations-Quellenvermerke bleiben unverändert.
 
 ---
 
-**English summary:** An interactive European weather map built with React, TypeScript, OpenLayers and a native Node.js backend. Engineering highlights include GeoTIFF-to-PNG radar processing, in-flight request coalescing, timestamp-based radar/satellite playback, polygon union with preserved local warning details, country-filtered location search and point forecasts. Local setup: Node.js 24, `npm ci`, then `npm run api` and `npm run dev` in separate terminals. This is a working development project with deployment preparation, not a production-cleared service. Application licensing and several legal/operational release checks remain open.
+**English summary:** An interactive European weather map built with React, TypeScript, OpenLayers and a native Node.js backend. Engineering highlights include GeoTIFF-to-PNG radar processing, in-flight request coalescing, timestamp-based radar/satellite playback, polygon union with preserved local warning details, country-filtered location search and point forecasts. Local setup: Node.js 24, `npm ci`, then `npm run api` and `npm run dev` in separate terminals. Application code is licensed under AGPL-3.0-or-later; data and dependencies retain their separate terms. The build provides a source archive and licence download. Self-hosting instructions are included; live deployment has not yet been verified.

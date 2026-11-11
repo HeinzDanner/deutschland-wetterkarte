@@ -26,12 +26,11 @@ import { WeatherWarnings } from './WeatherWarnings'
 import { LocationSearch, type ForecastLocation } from './LocationSearch'
 import { useLanguage } from './i18n'
 import { LegalPages } from './LegalPages'
+import { satelliteSource, satelliteMapAttribution } from './satelliteAttribution'
 import { PreferenceConsentControls, usePreferenceConsent } from './PreferenceConsentControls'
 import { DEFAULT_VIEW, DEFAULT_LAYERS, MAP_VIEW_KEY, MAP_LAYERS_KEY, readPreference, savePreference, validView, validLayers } from './mapPreferences'
 import './map.css'
 
-const EUMETSAT_WMS_URL = 'https://view.eumetsat.int/geoserver/ows'
-const SATELLITE_LAYER = 'msg_fes:ir108'
 const DWD_RADAR_FALLBACK_ENABLED = false
 const DWD_WMS_URL = 'https://maps.dwd.de/geoserver/ows'
 const RADAR_LAYER = 'dwd:Niederschlagsradar'
@@ -395,7 +394,7 @@ function App() {
     if (!resolution || !size) return
     // Clouds are soft and IR data is coarse, so a reduced, palette-based image loads much faster.
     const buffer = createRadarBuffer(
-      EUMETSAT_WMS_URL, SATELLITE_LAYER, view.calculateExtent(size), resolution,
+      satelliteSource.url, satelliteSource.layer, view.calculateExtent(size), resolution,
       0.6, view.getProjection(), { format: 'image/png8', maxParallel: 6 },
     )
     satelliteBuffer.current = buffer
@@ -422,6 +421,7 @@ function App() {
     let active = true
     void buffer.load(satelliteTime, true).then((source) => {
       if (!active) return
+      source.setAttributions(satelliteMapAttribution(satelliteTime))
       layer.setSource(source)
       layer.setVisible(true)
       setDisplayedSatelliteTime(satelliteTime)
@@ -1127,7 +1127,7 @@ function App() {
         <div ref={mapElement} className="map" aria-label={t('Wetterkarte Europa', 'Europe weather map')} />
       </section>
       <footer>
-        <LegalPages />
+        <LegalPages satelliteTime={displayedSatelliteTime} />
         <PreferenceConsentControls />
         {t(
           'Datenquellen: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Kartenbasis: OpenStreetMap',

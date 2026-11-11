@@ -2,6 +2,7 @@
   "name": "deutschland-wetterkarte",
   "private": true,
   "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
@@ -9,7 +10,8 @@
     "api": "node server.mjs",
     "dev": "vite",
     "notices": "node scripts/third-party-notices.mjs",
-    "prebuild": "npm run notices",
+    "prebuild": "npm run notices && npm run source-release",
+    "source-release": "node scripts/source-release.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

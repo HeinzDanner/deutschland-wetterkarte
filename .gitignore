@@ -13,6 +13,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 data/station-outages.json
 data/station-outages.json.tmp
 backups/
+public/application-source.tar.gz
+public/application-license.txt
 pids
 *.pid
 *.seed

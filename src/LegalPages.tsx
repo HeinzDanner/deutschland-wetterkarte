@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from './i18n'
 import { legalConfig } from './legalConfig'
+import { satelliteSource, satelliteDataYear } from './satelliteAttribution'
 
 const pages = ['impressum', 'datenschutz', 'quellen', 'wetterhinweise'] as const
 type Page = typeof pages[number]
@@ -9,8 +10,9 @@ function currentPage(): Page | null {
   return pages.find((page) => window.location.hash === `#${page}`) ?? null
 }
 
-export function LegalPages() {
+export function LegalPages({ satelliteTime = null }: { satelliteTime?: string | null }) {
   const { t } = useLanguage()
+  const satelliteYear = satelliteDataYear(satelliteTime)
   const [page, setPage] = useState(currentPage)
   const dialog = useRef<HTMLDialogElement>(null)
   const titles: Record<Page, string> = {
@@ -40,6 +42,7 @@ export function LegalPages() {
   return <>
     <nav className="legal-links" aria-label={t('Rechtliches und Quellen', 'Legal information and sources')}>
       {pages.map((item) => <a key={item} href={`#${item}`}>{titles[item]}</a>)}
+      <a href="/application-source.tar.gz" download>{t('Quellcode (AGPL)', 'Source code (AGPL)')}</a>
     </nav>
     <dialog ref={dialog} className="legal-dialog" aria-labelledby="legal-title" onClose={close}>
       <header className="legal-header">
@@ -57,20 +60,31 @@ export function LegalPages() {
           )}
         </p>}
         {page === 'impressum' && <>
-          <h3>{t('Anbieter und Kontakt', 'Operator and contact')}</h3>
+          <h3>{t('Angaben gemäß § 5 DDG', 'Information pursuant to section 5 DDG')}</h3>
           <dl>
             <dt>{t('Vollständiger Name', 'Full name')}</dt><dd>{legalConfig.operator || missing}</dd>
             <dt>{t('Ladungsfähige Anschrift', 'Serviceable postal address')}</dt>
             <dd className="legal-address">{legalConfig.address || missing}</dd>
             <dt>{t('Kontakt-E-Mail', 'Contact email')}</dt>
             <dd>{legalConfig.email ? <a href={`mailto:${legalConfig.email}`}>{legalConfig.email}</a> : missing}</dd>
-            <dt>{t('Weitere unmittelbare Kontaktmöglichkeit', 'Additional direct contact method')}</dt>
-            <dd>{legalConfig.additionalContact || t('Noch festzulegen und auf Erforderlichkeit zu prüfen.', 'To be determined and assessed for necessity.')}</dd>
+            {legalConfig.additionalContact && <>
+              <dt>{t('Weitere unmittelbare Kontaktmöglichkeit', 'Additional direct contact method')}</dt>
+              <dd>{legalConfig.additionalContact}</dd>
+            </>}
           </dl>
           <p>{t(
-            'Der Betrieb als natürliche Person setzt keine Firma voraus. Register-, Vertretungs-, berufsrechtliche oder Umsatzsteuerangaben nur ergänzen, soweit tatsächlich einschlägig. Keine persönliche Steuer-ID oder Steuernummer veröffentlichen. Bei journalistisch-redaktionellen Inhalten zusätzliche Verantwortlichkeit prüfen.',
-            'An individual operator does not need a company. Add registration, representation, professional or VAT details only where applicable. Do not publish a personal tax ID or tax number. Assess additional responsibility requirements for journalistic/editorial content.',
+            'Die Wetterdaten werden von den genannten Wetterdiensten bezogen und aufbereitet dargestellt. Richtigkeit, Vollständigkeit und Aktualität der Wetterdaten, Warnungen und Vorhersagen sind nicht gewährleistet. Diese Darstellung ersetzt keinen amtlichen Warnkanal; maßgeblich sind die offiziellen Warnungen des Deutschen Wetterdienstes.',
+            'Weather data is obtained from the listed weather services and processed for display. Accuracy, completeness and timeliness of weather data, warnings and forecasts are not guaranteed. This presentation does not replace an official alert channel; the official warnings issued by Deutscher Wetterdienst are authoritative.',
           )}</p>
+          <h3>{t('Externe Links', 'External links')}</h3>
+          <p>{t(
+            'Diese Website enthält Links zu externen Websites. Deren Inhalte werden von den jeweiligen Anbietern verantwortet; auf ihre Gestaltung haben wir keinen Einfluss.',
+            'This website contains links to external websites. Their respective providers are responsible for their content; we have no control over their design.',
+          )}</p>
+          <h3>{t('Quellenverzeichnis', 'Sources')}</h3>
+          <p>{t('Die verwendeten Datenquellen, Lizenz- und Bearbeitungshinweise sind unter ', 'The data sources, licences and modification notices are listed under ')}
+            <a href="#quellen">{titles.quellen}</a>
+            {t(' aufgeführt und Bestandteil dieses Impressums.', ' and form part of this legal notice.')}</p>
           <h3>{t('Datenbasis der Wetterwarnungen', 'Weather warning data source')}</h3>
           <p>{t(
             'Datenbasis: Deutscher Wetterdienst, Wetterwarnungen — Warngebiete zusammengeführt und gefiltert dargestellt. ',
@@ -140,9 +154,23 @@ export function LegalPages() {
               {' – '}{t('Stationsbeobachtungen. Datenbasis: Deutscher Wetterdienst, Wetterwarnungen — Warngebiete zusammengeführt und gefiltert dargestellt. Aktualisierung alle fünf Minuten; Vollständigkeit und Aktualität nicht gewährleistet. ',
                 'Station observations. Data source: Deutscher Wetterdienst, weather warnings — warning areas merged and filtered for display. Updated every five minutes; completeness and timeliness are not guaranteed. ')}
               <a href="https://www.dwd.de/DE/service/rechtliche_hinweise/rechtliche_hinweise.html">{t('Rechtliche Hinweise', 'Legal information')}</a>.</li>
-            <li><a href="https://www.eumetsat.int/">EUMETSAT</a>
-              {' – '}{t('Meteosat-Infrarotbilder über view.eumetsat.int, msg_fes:ir108. Anzeige mit angepasstem Kontrast, Helligkeit und Überblendung.',
-                'Meteosat infrared imagery via view.eumetsat.int, msg_fes:ir108. Displayed with adjusted contrast, brightness and blending.')}</li>
+            <li><a href={satelliteSource.sourceUrl}>{satelliteSource.provider}</a>
+              {' – '}{t('Diese Anwendung basiert auf EUMETSAT-Meteosat-Daten, Produkt ', 'This service is based on EUMETSAT Meteosat data, product ')}
+              <code>{satelliteSource.layer}</code>
+              {t(', bereitgestellt über ', ', provided through ')}{satelliteSource.service}.
+              {' '}{t('Jahr der Veröffentlichung beziehungsweise Bereitstellung: ', 'Year of publication or distribution: ')}
+              {satelliteYear ?? t('Ohne geladenes Satellitenbild nicht bestimmt.', 'Not determined without a loaded satellite image.')}
+              {satelliteYear && t(' (UTC-Jahr des angezeigten Datenzeitpunkts).', ' (UTC year of the displayed data timestamp).')}
+              {' '}{t('Lizenz: Creative Commons Namensnennung 4.0 International', 'Licensed under Creative Commons Attribution 4.0 International')}
+              {' ('}<a href={satelliteSource.licenceUrl}>{satelliteSource.licence}</a>{'). '}
+              {t(
+                'Eigene Darstellungsänderungen: Kontrast auf 1,9 und Helligkeit auf 1,25 gesetzt; Screen-Mischmodus und einstellbare Deckkraft zur Überblendung mit anderen Kartenebenen. Die meteorologischen Ausgangswerte werden nicht neu berechnet. Technische Darstellung: WMS-PNG8 mit reduzierter Bildauflösung im Kartenclient.',
+                'Display changes: contrast set to 1.9 and brightness to 1.25; screen blending and adjustable opacity for blending with other map layers. The original meteorological values are not recalculated. Technical rendering: WMS PNG8 at reduced image resolution in the map client.',
+              )}
+              {' '}{t(
+                'EUMETSAT Legal Affairs bestätigte am 11.11.2026 CC BY 4.0 für EUMETView-Daten einschließlich dieses Layers. Dies bestätigt weder unbegrenzte Dienstzugriffe noch eine Empfehlung, Zertifizierung oder Partnerschaft durch EUMETSAT. Die Datenlizenz gilt nicht automatisch für unseren Anwendungscode.',
+                'On 11 November 2026, EUMETSAT Legal Affairs confirmed CC BY 4.0 for EUMETView data including this layer. This does not confirm unlimited service access or imply endorsement, certification or partnership by EUMETSAT. The data licence does not automatically apply to our application code.',
+              )}</li>
             <li><a href="https://open-meteo.com/">Open-Meteo</a>
               {' – '}{t('Vorhersagen (DWD ICON) und Ortssuche; ', 'forecasts (DWD ICON) and geocoding; ')}
               <a href="https://open-meteo.com/en/licence">CC BY 4.0</a>
@@ -161,8 +189,8 @@ export function LegalPages() {
             'The warning display has been adapted to implement the DWD source attribution rules; this is not final legal clearance.',
           )}</p>
           <p className="legal-draft">{t(
-            'Noch offen vor Freigabe: konkrete EUMETSAT-WMS-Bedingungen, Zippopotam.us-Dienstbedingungen, produktbezogene DWD-Vorgaben insbesondere für Warnungen sowie Herkunft/Lizenz der eingebundenen Deutschland-Geometrie. Eine Quellenangabe ersetzt keine Nutzungserlaubnis.',
-            'Still unresolved before clearance: exact EUMETSAT WMS terms, Zippopotam.us service terms, product-specific DWD requirements especially for warnings, and provenance/licence of the bundled Germany geometry. Attribution does not replace permission to use a source.',
+            'Noch offen vor Freigabe: technische EUMETView-Dienstbedingungen, Zugriffslimits und gegebenenfalls Caching-/Proxy-Vorgaben sowie Datenschutz direkter Browserverbindungen; abweichende Datenquellen gesondert prüfen. Außerdem Zippopotam.us-Dienstbedingungen, produktbezogene DWD-Vorgaben insbesondere für Warnungen sowie Herkunft/Lizenz der eingebundenen Deutschland-Geometrie. Eine Quellenangabe ersetzt keine Nutzungserlaubnis.',
+            'Still unresolved before clearance: technical EUMETView service terms, access limits and any caching/proxy requirements, plus privacy of direct browser connections; different data sources require separate review. Also Zippopotam.us service terms, product-specific DWD requirements especially for warnings, and provenance/licence of the bundled Germany geometry. Attribution does not replace permission to use a source.',
           )}</p>
           <h3>{t('Software', 'Software')}</h3>
           <p>{t('Verwendet werden unter anderem React, OpenLayers, proj4, geotiff, pngjs und polygon-clipping. ',
@@ -170,9 +198,11 @@ export function LegalPages() {
             <a href="./third-party-notices.txt">{t('Lizenztexte und Hinweise der Produktionsabhängigkeiten', 'Production dependency licence texts and notices')}</a>.
           </p>
           <p>{t(
-            'Für den eigenen Anwendungscode wurde noch keine Veröffentlichungslizenz gewählt. Datenlizenzen und Lizenzen eingebundener Software gelten jeweils getrennt; die Veröffentlichung eines Repositorys allein erteilt keine pauschale Nutzungserlaubnis für den eigenen Code.',
-            'No publication licence has been selected for the application’s own code. Data and third-party software licences apply separately; publishing a repository alone does not grant blanket permission to reuse the application code.',
+            'Der eigene Anwendungscode steht unter GNU Affero General Public License, Version 3 oder einer späteren Version (AGPL-3.0-or-later). Wetter- und Kartendaten, Screenshots mit Fremdinhalten und eingebundene Software unterliegen ihren jeweiligen gesonderten Bedingungen. Diese Lizenzwahl erteilt keine zusätzlichen Rechte an fremden Daten.',
+            'Our application code is licensed under the GNU Affero General Public License, version 3 or any later version (AGPL-3.0-or-later). Weather and map data, screenshots containing third-party content and included software remain subject to their respective separate terms. This licence choice grants no additional rights to third-party data.',
           )}</p>
+          <p><a href="/application-license.txt">{t('AGPL-Lizenztext', 'AGPL licence text')}</a>
+            {' · '}<a href="/application-source.tar.gz" download>{t('Quellcode dieser Version herunterladen', 'Download the source code of this version')}</a></p>
         </>}
         {page === 'wetterhinweise' && <>
           <p>{t(

@@ -5,6 +5,8 @@ RUN npm ci --no-audit --no-fund
 COPY index.html vite.config.ts tsconfig*.json ./
 COPY src ./src
 COPY scripts ./scripts
+COPY LICENSE README.md Dockerfile .dockerignore .env.example compose*.yaml *.mjs ./
+COPY deploy ./deploy
 RUN npm run build
 
 FROM node:24-bookworm-slim AS api
@@ -14,6 +16,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY server.mjs opera.mjs warnings.mjs station-history.mjs location-search.mjs ./
 COPY src/data/searchCountries.json ./src/data/searchCountries.json
+COPY LICENSE ./LICENSE
 RUN mkdir /app/data && chown node:node /app/data
 USER node
 EXPOSE 8787

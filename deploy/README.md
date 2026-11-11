@@ -166,8 +166,24 @@ neue Historie.
 - Die freiwillige localStorage-Einstellungsspeicherung, lokale Dokumentation der
   Entscheidung und direkte Browserabrufe bei OSM/EUMETSAT rechtlich pruefen.
   Die lokale Entscheidung ist kein unabhaengiger serverseitiger Nachweis.
-- Quellen/Lizenzen nennt offene EUMETSAT-, Zippopotam.us-, DWD-Produkt- und
-  Deutschland-Geometrie-Pruefungen. Auch die eigene Code-Lizenz ist noch offen.
+- EUMETSAT Legal Affairs hat am 11.11.2026 CC BY 4.0 fuer EUMETView-Daten
+  einschliesslich `msg_fes:ir108` bestaetigt. Frontend und Backend verwenden
+  diesen Layer am WMS `https://view.eumetsat.int/geoserver/ows`.
+  Attribution und Lizenzlink sind umgesetzt; das UTC-Jahr des geladenen
+  Bildzeitpunkts liefert das Datenjahr. Ohne geladenes Bild bleibt es unbekannt.
+  Kontrast/Helligkeit und einstellbare Ueberblendung sind dokumentiert.
+  Die Bestaetigung ersetzt keine Pruefung technischer Dienstbedingungen,
+  Zugriffslimits, Caching-/Proxy-Vorgaben und direkter Browserverbindungen.
+  Sie ist keine Website-Freigabe oder Aenderung der eigenen Code-Lizenz.
+- Quellen/Lizenzen nennt offene Zippopotam.us-, DWD-Produkt- und
+  Deutschland-Geometrie-Pruefungen. Der eigene Anwendungscode steht unter
+  AGPL-3.0-or-later; Daten und Fremdsoftware behalten gesonderte Bedingungen.
+  `npm run build` erzeugt einen oeffentlichen Quellcode- und Lizenzdownload
+  unter `/application-source.tar.gz` und `/application-license.txt`.
+  Beide Downloads und den Link unter Quellen/Lizenzen nach jedem Deployment
+  pruefen. Das Archiv enthaelt auch Backend und Build-/Deploymentdateien,
+  aber keine `.env` oder privaten Schluessel. Oeffentliche Betreiberangaben
+  in `src/legalConfig.ts` sind dagegen bewusst enthalten.
 - Recherche zu Datenbedingungen (keine Freigabe):
   - DWD Open Data verweist fuer die POI-Stationsdateien auf
     https://www.dwd.de/copyright. Fuer Warnungen nennt

@@ -8,6 +8,15 @@
 !src/**
 !scripts/
 !scripts/third-party-notices.mjs
+!scripts/source-release.mjs
+!LICENSE
+!README.md
+!Dockerfile
+!.dockerignore
+!.env.example
+!compose.yaml
+!compose.private.yaml
+!*.test.mjs
 !server.mjs
 !opera.mjs
 !warnings.mjs
@@ -16,3 +25,5 @@
 !deploy/
 !deploy/Caddyfile
 !deploy/weather-app.caddy
+!deploy/Caddyfile.private
+!deploy/README.md
