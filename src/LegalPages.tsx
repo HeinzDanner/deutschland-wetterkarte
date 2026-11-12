@@ -10,8 +10,8 @@ function currentPage(): Page | null {
   return pages.find((page) => window.location.hash === `#${page}`) ?? null
 }
 
-export function LegalPages({ satelliteTime = null }: { satelliteTime?: string | null }) {
-  const { t } = useLanguage()
+export function LegalPages({ satelliteTime = null, embedded = false }: { satelliteTime?: string | null; embedded?: boolean }) {
+  const { t, mobileText } = useLanguage()
   const satelliteYear = satelliteDataYear(satelliteTime)
   const [page, setPage] = useState(currentPage)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -31,24 +31,20 @@ export function LegalPages({ satelliteTime = null }: { satelliteTime?: string | 
     }
   }, [])
   useEffect(() => {
+    if (embedded) return
     if (page && !dialog.current?.open) dialog.current?.showModal()
     if (!page && dialog.current?.open) dialog.current.close()
-  }, [page])
+  }, [page, embedded])
   const close = () => {
     if (currentPage()) window.history.replaceState(null, '', window.location.pathname + window.location.search)
     setPage(null)
   }
   const missing = t('Noch einzutragen', 'To be completed')
-  return <>
-    <nav className="legal-links" aria-label={t('Rechtliches und Quellen', 'Legal information and sources')}>
-      {pages.map((item) => <a key={item} href={`#${item}`}>{titles[item]}</a>)}
-      <a href="/application-source.tar.gz" download>{t('Quellcode (AGPL)', 'Source code (AGPL)')}</a>
-    </nav>
-    <dialog ref={dialog} className="legal-dialog" aria-labelledby="legal-title" onClose={close}>
+  const content = <>
       <header className="legal-header">
         <h2 id="legal-title">{page ? titles[page] : ''}</h2>
-        <button type="button" onClick={() => dialog.current?.close()} autoFocus>
-          {t('Schließen', 'Close')}
+        <button type="button" onClick={embedded ? close : () => dialog.current?.close()} autoFocus={!embedded}>
+          {embedded ? `← ${mobileText('back')}` : t('Schließen', 'Close')}
         </button>
       </header>
       <div className="legal-body">
@@ -142,6 +138,15 @@ export function LegalPages({ satelliteTime = null }: { satelliteTime?: string | 
             'Consent covers preference storage only, not direct third-party connections. The legal classification of storing the decision itself remains to be reviewed. Optional preference storage is based on section 25(1) TDDDG and, insofar as personal data is involved, Article 6(1)(a) GDPR.',
           )}</p>
           <h3>{t('6. Abruf der Wetterdaten', '6. Retrieval of weather data')}</h3>
+          <h4>{t('Optionaler eigener Standort', 'Optional device location')}</h4>
+          <p>{t(
+            'Über „Eigenen Standort anzeigen“ kannst du nach einem Hinweis ausdrücklich eine einmalige Standortermittlung anfordern. Erst dann verwendet die App die Geolocation-Funktion des Browsers; zusätzlich gilt dessen Standortberechtigung. Es gibt keine laufende Ortung, keinen Standortverlauf und keine automatische Vorhersage oder Adresssuche. Die Position wird nur im Arbeitsspeicher dieses Besuchs als ungefährer Kartenpunkt verarbeitet und kann über „Standort ausblenden“ entfernt werden. Beim Neuladen geht sie verloren. Nach erfolgreicher Ortung wird der Kartenausschnitt für den Rest dieses Besuchs nicht mehr im localStorage gespeichert, auch bei Zustimmung zur Einstellungsspeicherung; eine vorher gespeicherte Ansicht bleibt unverändert.',
+            'Using “Show my location”, you can explicitly request a one-time location reading after an explanatory notice. Only then does the app use browser geolocation, subject also to browser location permission. There is no continuous tracking, location history, automatic forecast or address lookup. The position is processed in memory for this visit only as an approximate map point and can be removed using “Hide location”. Reloading discards it. After successful location access the map view is no longer saved in localStorage for the rest of this visit, even with preference-storage consent; a previously saved view remains unchanged.',
+          )}</p>
+          <p>{t(
+            'Die App sendet die ermittelte Position nicht als Standortabfrage an unseren Server oder an Open-Meteo. Das anschließende Zentrieren löst jedoch Kartenkachel- und bei aktiver Satellitenebene Bildabrufe aus: OpenStreetMap bzw. EUMETSAT können aus Ausschnitt und Verbindungsdaten den ungefähren Standort ableiten. Browser und Betriebssystem können zur Ortung eigene Dienste nutzen; dafür gelten deren Datenschutzhinweise. Eine später selbst ausgelöste Punktvorhersage übermittelt die ausgewählten Koordinaten wie unten beschrieben. Die freiwillig angeforderte Standortfunktion wird auf Art. 6 Abs. 1 lit. a DSGVO gestützt. PRÜFEN: Einwilligungsablauf, Nachweis und Verarbeitung durch beteiligte Standort- und Kartenanbieter abschließend rechtlich bewerten.',
+            'The app does not send the obtained position as a location request to our server or Open-Meteo. Centring does trigger map tile and, when satellite is enabled, image requests: OpenStreetMap or EUMETSAT may infer your approximate location from the requested area and connection data. Your browser and operating system may use their own location services, subject to their privacy notices. A point forecast you subsequently request yourself transmits the selected coordinates as described below. The voluntarily requested location feature is based on Article 6(1)(a) GDPR. CHECK: Complete the legal assessment of consent, evidence and processing by the location and map providers involved.',
+          )}</p>
           <h4>{t('Direkt aus deinem Browser', 'Directly from your browser')}</h4>
           <p>{t(
             'Der Browser lädt Kartenkacheln direkt von tile.openstreetmap.org (OpenStreetMap Foundation). Bei aktivierter Satellitenebene lädt er Meteosat-Bilder direkt von view.eumetsat.int (EUMETSAT/EUMETView). Dabei werden insbesondere deine IP-Adresse, angeforderte Kartenausschnitte beziehungsweise Bildparameter und technische Verbindungsdaten sowie gegebenenfalls die Herkunftswebsite übermittelt. Die Bilder werden vom Anbieter an deinen Browser geliefert. Die Ebene ist aktivierbar: EUMETSAT Legal Affairs bestätigte am 11.11.2026 die Nutzung von EUMETView-Daten einschließlich msg_fes:ir108 unter CC BY 4.0. Diese Datenlizenz ersetzt keine Datenschutzprüfung. PRÜFEN: Empfänger, Rechtsgrundlagen, mögliche Drittlandverarbeitung und eine gegebenenfalls erforderliche Einwilligung für direkte Verbindungen.',
@@ -266,6 +271,13 @@ export function LegalPages({ satelliteTime = null }: { satelliteTime?: string | 
           )}</p>
         </>}
       </div>
-    </dialog>
+  </>
+  return <>
+    <nav className="legal-links" aria-label={t('Rechtliches und Quellen', 'Legal information and sources')}>
+      {pages.map((item) => <a key={item} href={`#${item}`}>{titles[item]}</a>)}
+      <a href="/application-source.tar.gz" download>{t('Quellcode (AGPL)', 'Source code (AGPL)')}</a>
+    </nav>
+    {embedded ? page && <div className="legal-embedded">{content}</div>
+      : <dialog ref={dialog} className="legal-dialog" aria-labelledby="legal-title" onClose={close}>{content}</dialog>}
   </>
 }

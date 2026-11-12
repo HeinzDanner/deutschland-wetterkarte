@@ -9,8 +9,9 @@
     "test": "node --test *.test.mjs",
     "api": "node server.mjs",
     "dev": "vite",
+    "predev": "node scripts/app-assets.mjs",
     "notices": "node scripts/third-party-notices.mjs",
-    "prebuild": "npm run notices && npm run source-release",
+    "prebuild": "npm run notices && node scripts/app-assets.mjs && npm run source-release",
     "source-release": "node scripts/source-release.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"

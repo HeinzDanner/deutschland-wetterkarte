@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type OlMap from 'ol/Map'
 import ImageLayer from 'ol/layer/Image'
 import ImageStatic from 'ol/source/ImageStatic'
@@ -6,7 +6,9 @@ import proj4 from 'proj4'
 import { register } from 'ol/proj/proj4'
 import type { Extent } from 'ol/extent'
 import { useLanguage } from './i18n'
+import { radarErrorMessage } from './radarError'
 import { retainedRadarIndex } from './radarTimeline'
+import { useLayerPlayback, type LayerPlayback } from './useLayerPlayback'
 
 type FrameList = {
   frames: string[]
@@ -97,8 +99,8 @@ function createBuffer(onReady: (time: string) => void) {
   }
 }
 
-export function OperaRadar({ map, active, onChange, synchronized, synchronizedTime, onFrames, onStatus }: Props) {
-  const { t, locale } = useLanguage()
+export function useOperaRadar({ map, active, synchronized, synchronizedTime, onFrames, onStatus }: Omit<Props, 'onChange'>) {
+  const { t, locale, language } = useLanguage()
   const timeFormat = new Intl.DateTimeFormat(locale, {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
     timeZone: 'Europe/Berlin', timeZoneName: 'short',
@@ -107,9 +109,9 @@ export function OperaRadar({ map, active, onChange, synchronized, synchronizedTi
   const buffer = useRef<ReturnType<typeof createBuffer> | null>(null)
   const [timeline, setTimeline] = useState<{ data: FrameList | null; index: number }>({ data: null, index: 0 })
   const { data, index } = timeline
-  const setIndex = (value: number | ((index: number) => number)) => setTimeline((previous) => ({
+  const setIndex = useCallback((value: number | ((index: number) => number)) => setTimeline((previous) => ({
     ...previous, index: typeof value === 'function' ? value(previous.index) : value,
-  }))
+  })), [])
   const [readyFrames, setReadyFrames] = useState<string[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [reload, setReload] = useState(0)
@@ -246,11 +248,33 @@ export function OperaRadar({ map, active, onChange, synchronized, synchronizedTi
     return () => { current = false }
   }, [active, map, data, reload])
 
-  useEffect(() => {
-    if (synchronized || !playing || !data || data.frames.length < 2 || loading || displayed !== time) return
-    const timer = window.setTimeout(() => setIndex((i) => (i + 1) % data.frames.length), 500)
-    return () => window.clearTimeout(timer)
-  }, [playing, data, loading, displayed, time, synchronized])
+  useLayerPlayback({
+    enabled: active && !synchronized, playing, count: data?.frames.length ?? 0,
+    ready: !loading && !error && displayed === time, delay: 500, loop: true, setIndex,
+  })
+
+  const playback: LayerPlayback = {
+    frames: data?.frames ?? [], index, playing, time: displayed, loading: loading || refreshing, error: error ? radarErrorMessage(error, language) : null,
+    select: (next) => { setPlaying(false); setIndex(next) },
+    toggle: () => {
+      if (!playing && index === (data?.frames.length ?? 0) - 1) setIndex(0)
+      setPlaying(!playing)
+    },
+    reload: () => setReload((count) => count + 1),
+  }
+  return { data, index, setIndex, readyFrames, refreshing, setReload, playing, setPlaying,
+    loading, error, displayed, timeFormat, playback }
+}
+
+export function OperaRadar({ active, onChange, synchronized, controller }: {
+  active: boolean
+  onChange: (active: boolean) => void
+  synchronized: boolean
+  controller: ReturnType<typeof useOperaRadar>
+}) {
+  const { t, locale, language } = useLanguage()
+  const { data, index, setIndex, readyFrames, refreshing, setReload, playing, setPlaying,
+    loading, error, displayed, timeFormat } = controller
 
   return (
     <div className="layer-group">
@@ -300,7 +324,7 @@ export function OperaRadar({ map, active, onChange, synchronized, synchronizedTi
               />
             </>
           )}
-          {error && <p className="layer-error" role="alert">{t('OPERA-Radardaten konnten nicht geladen werden. Bitte erneut laden.', 'OPERA radar data could not be loaded. Please reload.')}</p>}
+          {error && <p className="layer-error" role="alert">{radarErrorMessage(error, language)}</p>}
           <button type="button" className="reload-button" onClick={() => setReload((count) => count + 1)}>{t('↻ Europa-Radar neu laden', '↻ Reload Europe radar')}</button>
           {refreshing && <p className="radar-range-note" role="status">{t('Radarzeitpunkte werden aktualisiert …', 'Updating radar times …')}</p>}
           <p className={`radar-range-note radar-loading-status${loading ? '' : ' radar-loading-status-idle'}`} role="status">

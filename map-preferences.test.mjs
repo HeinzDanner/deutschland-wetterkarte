@@ -2,6 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { DEFAULT_VIEW, DEFAULT_LAYERS, validView, validLayers } from './src/mapPreferences.ts'
 
+test('all available weather layers are enabled by default', () => {
+  for (const key of ['opera', 'satellite', 'stations', 'warnings']) {
+    assert.equal(DEFAULT_LAYERS[key], true)
+  }
+  assert.ok(validLayers({ ...DEFAULT_LAYERS, opera: false, satellite: false, stations: false, warnings: false }))
+})
+
 test('accepts default and saved map views but rejects invalid coordinates and zoom', () => {
   assert.ok(validView(DEFAULT_VIEW))
   assert.ok(validView({ center: [8.6, 50.1], zoom: 9 }))

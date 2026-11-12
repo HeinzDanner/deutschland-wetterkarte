@@ -19,7 +19,7 @@ import germanyRings from './data/germany.json'
 import { getRadarFrames, getSatelliteFrames, getStations, type WeatherStation } from './stations'
 import { createRadarBuffer } from './radarBuffer'
 import { StationForecast } from './StationForecast'
-import { OperaRadar, type RadarStatus } from './OperaRadar'
+import { OperaRadar, useOperaRadar, type RadarStatus } from './OperaRadar'
 import { commonFrameTimes } from './synchronizedTimeline'
 import { retainedRadarIndex } from './radarTimeline'
 import { WeatherWarnings } from './WeatherWarnings'
@@ -29,6 +29,12 @@ import { LegalPages } from './LegalPages'
 import { satelliteSource, satelliteMapAttribution } from './satelliteAttribution'
 import { PreferenceConsentControls, usePreferenceConsent } from './PreferenceConsentControls'
 import { DEFAULT_VIEW, DEFAULT_LAYERS, MAP_VIEW_KEY, MAP_LAYERS_KEY, readPreference, savePreference, validView, validLayers } from './mapPreferences'
+import { MobilePanel, type PanelName } from './MobilePanel'
+import { TimelineDock, type TimeLayer } from './TimelineDock'
+import { useMobile } from './useMobile'
+import { useLayerPlayback, type LayerPlayback } from './useLayerPlayback'
+import { LocateControl } from './LocateControl'
+import { InstallApp } from './InstallApp'
 import './map.css'
 
 const DWD_RADAR_FALLBACK_ENABLED = false
@@ -70,11 +76,70 @@ function App() {
   const [initialView] = useState(() => readPreference(MAP_VIEW_KEY, DEFAULT_VIEW, validView))
   const [initialLayers] = useState(() => readPreference(MAP_LAYERS_KEY, DEFAULT_LAYERS, validLayers))
   const [warningsVisible, setWarningsVisible] = useState(initialLayers.warnings)
-  const { language, locale, t, setLanguage } = useLanguage()
+  const { language, locale, t, setLanguage, mobileText } = useLanguage()
+  const mobile = useMobile()
+  const [activePanel, setActivePanel] = useState<PanelName | null>(null)
+  const [detailRequest, setDetailRequest] = useState<{ selector: string } | null>(null)
+  const revealDetails = useCallback((kind: 'forecast' | 'warning') => {
+    if (window.matchMedia('(max-width: 700px)').matches) {
+      setActivePanel(kind)
+    } else {
+      setDetailRequest({ selector: kind === 'forecast' ? '.station-card' : '.warning-card' })
+    }
+  }, [])
+  const [activeTimeline, setActiveTimeline] = useState<TimeLayer | null>(initialLayers.opera ? 'radar' : initialLayers.satellite ? 'satellite' : null)
+  const lastTimeline = useRef<TimeLayer>(initialLayers.satellite && !initialLayers.opera ? 'satellite' : 'radar')
+  const [warningLevel, setWarningLevel] = useState<number | null>(null)
+  const [warningOverview, setWarningOverview] = useState(0)
+  const [consentRequest, setConsentRequest] = useState(0)
+  const [legalOpen, setLegalOpen] = useState(false)
+  const closePanel = useCallback(() => {
+    setActivePanel(null)
+    if (['#impressum', '#datenschutz', '#quellen', '#wetterhinweise'].includes(window.location.hash)) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      window.dispatchEvent(new HashChangeEvent('hashchange'))
+    }
+  }, [])
+  useEffect(() => {
+    if (mobile || !detailRequest) return
+    let detail: HTMLElement | null = null
+    let timer: number | undefined
+    const frame = window.requestAnimationFrame(() => {
+      const panel = document.getElementById('weather-controls')
+      detail = panel?.querySelector<HTMLElement>(detailRequest.selector) ?? null
+      if (!panel || !detail) return
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      panel.scrollTo({
+        top: panel.scrollTop + detail.getBoundingClientRect().top - panel.getBoundingClientRect().top - 16,
+        behavior: reducedMotion ? 'instant' : 'smooth',
+      })
+      detail.classList.remove('detail-highlight')
+      void detail.offsetWidth
+      detail.classList.add('detail-highlight')
+      timer = window.setTimeout(() => detail?.classList.remove('detail-highlight'), 1800)
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+      detail?.classList.remove('detail-highlight')
+    }
+  }, [mobile, detailRequest])
+  useEffect(() => {
+    const update = () => {
+      const legal = ['#impressum', '#datenschutz', '#quellen', '#wetterhinweise'].includes(window.location.hash)
+      setLegalOpen(legal)
+      if (legal && window.matchMedia('(max-width: 700px)').matches) setActivePanel('menu')
+    }
+    update()
+    window.addEventListener('hashchange', update)
+    return () => window.removeEventListener('hashchange', update)
+  }, [mobile])
   const localization = useRef({ locale, t })
   localization.current = { locale, t }
   const mapElement = useRef<HTMLDivElement>(null)
   const map = useRef<Map | null>(null)
+  const privateMapView = useRef(false)
+  const protectLocation = useCallback(() => { privateMapView.current = true }, [])
   const stationLayer = useRef<VectorLayer<Cluster<Feature<Point>>> | null>(null)
   const stationSource = useRef(new VectorSource<Feature<Point>>())
   const radarLayer = useRef<ImageLayer<ImageWMS> | null>(null)
@@ -120,6 +185,36 @@ function App() {
   const syncIndex = commonTimes.length ? retainedRadarIndex(commonTimes, syncSelected ?? undefined) : -1
   const syncTime = commonTimes[syncIndex] ?? null
   const syncActive = synchronized && operaVisible && satelliteVisible
+  const opera = useOperaRadar({
+    map: mapReady ? map.current : null, active: operaVisible, synchronized: syncActive,
+    synchronizedTime: syncTime, onFrames: setOperaFrames, onStatus: setOperaStatus,
+  })
+  const satelliteSelection = useRef({ frames: satelliteFrames, index: satelliteFrameIndex })
+  satelliteSelection.current = { frames: satelliteFrames, index: satelliteFrameIndex }
+
+  useEffect(() => {
+    setActiveTimeline((current) => {
+      if (current === 'radar' && operaVisible || current === 'satellite' && satelliteVisible) return current
+      return operaVisible ? 'radar' : satelliteVisible ? 'satellite' : null
+    })
+  }, [operaVisible, satelliteVisible])
+
+  useEffect(() => {
+    if (activeTimeline) lastTimeline.current = activeTimeline
+  }, [activeTimeline])
+
+  useEffect(() => {
+    if (!mobile) setActivePanel(null)
+    const update = () => map.current?.updateSize()
+    const frame = window.requestAnimationFrame(update)
+    const timer = window.setTimeout(update, 300)
+    window.addEventListener('orientationchange', update)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+      window.removeEventListener('orientationchange', update)
+    }
+  }, [mobile, activePanel, mapReady])
 
   useEffect(() => {
     if (!operaVisible || !satelliteVisible) {
@@ -145,28 +240,6 @@ function App() {
     const timer = window.setTimeout(() => setSyncSelected(commonTimes[(syncIndex + 1) % commonTimes.length]), 500)
     return () => window.clearTimeout(timer)
   }, [syncActive, syncPlaying, syncReady, syncError, commonTimes, syncIndex])
-  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
-  const [mobileDetail, setMobileDetail] = useState<{ selector: string } | null>(null)
-  const panelElement = useRef<HTMLElement>(null)
-  const revealMobileDetails = useCallback((selector: string) => {
-    if (!window.matchMedia('(max-width: 700px)').matches) return
-    setMobilePanelOpen(true)
-    setMobileDetail({ selector })
-  }, [])
-
-  useEffect(() => {
-    if (!mobilePanelOpen || !mobileDetail) return
-    const panel = panelElement.current
-    const detail = panel?.querySelector<HTMLElement>(mobileDetail.selector)
-    if (panel && detail) {
-      panel.scrollTop += detail.getBoundingClientRect().top - panel.getBoundingClientRect().top - 16
-    }
-  }, [mobilePanelOpen, mobileDetail])
-
-  useEffect(() => {
-    if (forecastLocation || selectedStation) revealMobileDetails('.station-card')
-  }, [forecastLocation, selectedStation, revealMobileDetails])
-
   useEffect(() => {
     savePreference(MAP_LAYERS_KEY, {
       opera: operaVisible, satellite: satelliteVisible, stations: stationsVisible,
@@ -175,7 +248,7 @@ function App() {
   }, [operaVisible, satelliteVisible, stationsVisible, warningsVisible, satelliteOpacity, choice])
 
   useEffect(() => {
-    if (choice !== 'accepted' || !map.current) return
+    if (privateMapView.current || choice !== 'accepted' || !map.current) return
     const view = map.current.getView()
     const center = view.getCenter()
     const zoom = view.getZoom()
@@ -278,6 +351,7 @@ function App() {
     })
     map.current.on('moveend', () => setRadarViewport((version) => version + 1))
     const saveView = () => {
+      if (privateMapView.current) return
       const view = map.current?.getView()
       const center = view?.getCenter()
       const zoom = view?.getZoom()
@@ -298,6 +372,8 @@ function App() {
       })
       const members = feature?.get('features') as Feature<Point>[] | undefined
       if (!members && map.current?.forEachFeatureAtPixel(event.pixel,
+        (candidate) => candidate.get('ownLocation') ? true : undefined)) return
+      if (!members && map.current?.forEachFeatureAtPixel(event.pixel,
         (candidate) => candidate.get('warning') ? true : undefined)) return
       if (members && members.length > 1) {
         setForecastLocation(null)
@@ -309,6 +385,7 @@ function App() {
         map.current?.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 10, duration: 300 })
         setSelectedStation(null)
       } else {
+        revealDetails('forecast')
         const station = members?.[0].get('station') as WeatherStation | undefined
         setSelectedStation(station ?? null)
         if (station) {
@@ -357,6 +434,18 @@ function App() {
   }, [mapReady, language])
 
   useEffect(() => {
+    if (!mobile || !mapReady) return
+    const attribution = mapElement.current?.querySelector<HTMLElement>('.ol-attribution')
+    const content = mapElement.current?.parentElement
+    if (!attribution || !content) return
+    const update = () => content.style.setProperty('--map-attribution-height', `${attribution.getBoundingClientRect().height}px`)
+    const observer = new ResizeObserver(update)
+    observer.observe(attribution)
+    update()
+    return () => { observer.disconnect(); content.style.removeProperty('--map-attribution-height') }
+  }, [mobile, mapReady])
+
+  useEffect(() => {
     if (!satelliteVisible) {
       setSatellitePlaying(false)
       setDisplayedSatelliteTime(null)
@@ -367,8 +456,9 @@ function App() {
     const refresh = async () => {
       try {
         const data = await getSatelliteFrames(controller.signal)
+        const previous = satelliteSelection.current
         setSatelliteFrames(data.frames)
-        setSatelliteFrameIndex(data.frames.length - 1)
+        setSatelliteFrameIndex(retainedRadarIndex(data.frames, previous.frames[previous.index]))
         setSatelliteError(null)
       } catch (error: unknown) {
         if (controller.signal.aborted) return
@@ -377,7 +467,7 @@ function App() {
       }
     }
     void refresh()
-    const interval = window.setInterval(() => void refresh(), 15 * 60 * 1000)
+    const interval = window.setInterval(() => void refresh(), 5 * 60 * 1000)
 
     return () => {
       controller.abort()
@@ -452,16 +542,11 @@ function App() {
     if (!satelliteVisible) satelliteLayer.current?.setVisible(false)
   }, [satelliteVisible])
 
-  useEffect(() => {
-    if (syncActive || !satellitePlaying || satelliteFrames.length < 2 || satelliteImageLoading ||
-      satelliteImageError || displayedSatelliteTime !== satelliteTime) return
-
-    const timeout = window.setTimeout(() => {
-      setSatelliteFrameIndex((index) => Math.min(index + 1, satelliteFrames.length - 1))
-    }, 200)
-    return () => window.clearTimeout(timeout)
-  }, [satellitePlaying, satelliteFrames, satelliteImageLoading, satelliteImageError,
-    displayedSatelliteTime, satelliteTime, syncActive])
+  useLayerPlayback({
+    enabled: satelliteVisible && !syncActive, playing: satellitePlaying, count: satelliteFrames.length,
+    ready: !satelliteImageLoading && !satelliteImageError && displayedSatelliteTime === satelliteTime,
+    delay: 200, loop: false, setIndex: setSatelliteFrameIndex,
+  })
 
   useEffect(() => {
     if (satelliteFrameIndex === satelliteFrames.length - 1) setSatellitePlaying(false)
@@ -629,6 +714,45 @@ function App() {
     }))
   }, [stations])
 
+  const panelContent = (name: PanelName) => ({
+    className: 'panel-section',
+    hidden: mobile && activePanel !== name,
+    inert: mobile && activePanel !== name,
+  })
+  const satellitePlayback: LayerPlayback = {
+    frames: satelliteFrames, index: satelliteFrameIndex, playing: satellitePlaying,
+    time: displayedSatelliteTime, loading: satelliteImageLoading || (!satelliteFrames.length && !satelliteError),
+    error: satelliteError || satelliteImageError
+      ? t('Satellitendaten konnten nicht geladen werden.', 'Could not load satellite data.') : null,
+    select: (index) => { setSatellitePlaying(false); setSatelliteFrameIndex(index) },
+    toggle: () => {
+      if (!satellitePlaying && satelliteFrameIndex === satelliteFrames.length - 1) setSatelliteFrameIndex(0)
+      setSatellitePlaying(!satellitePlaying)
+    },
+    reload: () => setSatelliteReload((count) => count + 1),
+  }
+  const syncPlayback: LayerPlayback = {
+    frames: commonTimes, index: Math.max(0, syncIndex), playing: syncPlaying, time: syncReady ? syncTime : null,
+    loading: !syncReady && !syncError,
+    error: syncError ? t('Gemeinsame Wiedergabe wegen eines Ladefehlers pausiert. Betroffenen Layer erneut laden.',
+      'Synchronized playback paused after a loading error. Reload the affected layer.')
+      : !commonTimes.length ? t('Keine gemeinsamen Zeitpunkte verfügbar.', 'No matching times available.') : null,
+    select: (index) => { setSyncPlaying(false); setSyncSelected(commonTimes[index]) },
+    toggle: () => {
+      if (!syncPlaying && syncIndex === commonTimes.length - 1) setSyncSelected(commonTimes[0])
+      setSyncPlaying(!syncPlaying)
+    },
+    reload: () => { opera.playback.reload(); setSatelliteReload((count) => count + 1) },
+  }
+  const showForecastOnMap = () => {
+    const position = selectedStation ?? forecastLocation
+    if (!position) return
+    closePanel()
+    map.current?.getView().animate({
+      center: fromLonLat([position.longitude, position.latitude]), zoom: 9, duration: 500,
+    })
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -660,25 +784,56 @@ function App() {
         </div>
       </header>
 
-      <section className={`content${mobilePanelOpen ? ' mobile-panel-open' : ''}`}>
-        <div className="mobile-map-toolbar">
-          <button type="button" aria-controls="weather-controls" aria-expanded={mobilePanelOpen}
-            onClick={() => setMobilePanelOpen((open) => !open)}>
-            {mobilePanelOpen ? t('Bedienfeld schließen', 'Close controls') : t('Suche & Layer', 'Search & layers')}
-          </button>
-        </div>
-        <aside className="control-panel" id="weather-controls" ref={panelElement}
+      <section className="content">
+        <LocateControl map={mapReady ? map.current : null} blocked={mobile && !!activePanel} onLocated={protectLocation} />
+        {mobile && <div className="mobile-floating" inert={!!activePanel}>
+          <div className="mobile-search-area">
+            <button type="button" className="mobile-search-pill" onClick={() => setActivePanel('search')}>
+              <span aria-hidden="true">⌕</span> {mobileText('searchPlaceholder')}
+            </button>
+            {warningLevel !== null && <button type="button" className={`mobile-warning-chip warning-level-${warningLevel}`}
+              onClick={() => { setWarningOverview((value) => value + 1); setActivePanel('warning') }}>
+              ⚠ {mobileText('warningLevel')} {warningLevel}
+            </button>}
+          </div>
+          <div className="mobile-edge-buttons">
+            <button type="button" aria-label={mobileText('layers')} title={mobileText('layers')} onClick={() => setActivePanel('layers')}>▱</button>
+            <button type="button" aria-label={mobileText('timeLayers')} title={mobileText('timeLayers')}
+              aria-pressed={!!activeTimeline} onClick={() => {
+                const layer = lastTimeline.current
+                if (layer === 'radar') { setOperaVisible(true); setRadarVisible(false) }
+                else setSatelliteVisible(true)
+                setActiveTimeline(layer)
+              }}>◷</button>
+            <button type="button" aria-label={mobileText('menu')} title={mobileText('menu')} onClick={() => setActivePanel('menu')}>⋯</button>
+          </div>
+          <TimelineDock active={activeTimeline}
+            radar={operaVisible ? syncActive ? syncPlayback : opera.playback : null}
+            satellite={satelliteVisible ? syncActive ? syncPlayback : satellitePlayback : null}
+            onSelect={setActiveTimeline} onClose={(layer) => {
+              if (layer === 'radar') setOperaVisible(false)
+              else setSatelliteVisible(false)
+            }} />
+        </div>}
+        <aside className="control-panel" id="weather-controls"
           aria-label={t('Suche, Layer und Wetterdetails', 'Search, layers and weather details')}>
-          <div>
+          <MobilePanel enabled={mobile} open={activePanel !== null}
+            title={mobileText(activePanel ?? 'menu')} onClose={closePanel}
+            initialFocus={activePanel === 'search' ? '#location-query' : undefined}>
+          <div className="desktop-only">
             <p className="panel-kicker">{t('V1-Prototyp', 'V1 prototype')}</p>
             <h2>{t('Layer', 'Layers')}</h2>
           </div>
+          <div {...panelContent('search')}>
           <LocationSearch onSelect={(place) => {
             setSelectedStation(null)
             setForecastLocation(place)
             setForecastIsMapPoint(false)
+            revealDetails('forecast')
             map.current?.getView().animate({ center: fromLonLat([place.longitude, place.latitude]), zoom: 9, duration: 500 })
           }} />
+          </div>
+          <div {...panelContent('layers')}>
           <button type="button" className="reload-button" onClick={() => {
             map.current?.getView().animate({
               center: fromLonLat(DEFAULT_VIEW.center), zoom: DEFAULT_VIEW.zoom, duration: 300,
@@ -686,10 +841,7 @@ function App() {
           }}>{t('Kartenansicht zurücksetzen', 'Reset map view')}</button>
           <OperaRadar
             synchronized={syncActive}
-            synchronizedTime={syncTime}
-            onFrames={setOperaFrames}
-            onStatus={setOperaStatus}
-            map={mapReady ? map.current : null}
+            controller={opera}
             active={operaVisible}
             onChange={(active) => {
               setOperaVisible(active)
@@ -1017,6 +1169,10 @@ function App() {
               </> : <p role="status">{t('Keine gemeinsamen Zeitpunkte verfügbar. Beide Zeitlisten müssen erfolgreich geladen sein.', 'No matching times available. Both timelines must load successfully.')}</p>}
             </div>}
           </div>
+          </div>
+          <div {...panelContent('forecast')}>
+          {mobile && (forecastLocation || selectedStation) && <button type="button" className="reload-button show-on-map"
+            onClick={showForecastOnMap}>{mobileText('showOnMap')}</button>}
           {forecastLocation && (
             <section className="station-card" aria-label={t('Ortsvorhersage', 'Location forecast')}>
               <button aria-label={t('Ortsvorhersage schließen', 'Close location forecast')} className="station-card-close"
@@ -1075,6 +1231,8 @@ function App() {
               />
             </section>
           )}
+          </div>
+          <div {...panelContent('layers')}>
           <div className="layer-group">
             <p className="layer-group-title">{t('Messwerte', 'Observations')}</p>
             <label className="layer-toggle">
@@ -1116,8 +1274,26 @@ function App() {
               {' '}{t('Datenbasis: Deutscher Wetterdienst, Einzelwerte in Clustern gemittelt.', 'Data source: Deutscher Wetterdienst, individual values averaged in clusters.')}
             </p>
           </div>
+          </div>
+          <div {...panelContent(activePanel === 'warning' ? 'warning' : 'layers')}>
           <WeatherWarnings map={mapReady ? map.current : null} visible={warningsVisible} onChange={setWarningsVisible}
-            onDetails={() => revealMobileDetails('.warning-card')} />
+            onDetails={() => revealDetails('warning')}
+            onSummary={setWarningLevel} overviewRequest={warningOverview}
+            detailsOnly={mobile && activePanel === 'warning'} mobile={mobile} onShowOnMap={closePanel} />
+          </div>
+          <div {...panelContent('menu')}>
+          <InstallApp visible={mobile} />
+          {mobile && <>
+            <div className="language-switch" role="group" aria-label={t('Sprache auswählen', 'Select language')}>
+              <button type="button" aria-pressed={language === 'de'} onClick={() => setLanguage('de')}>Deutsch</button>
+              <button type="button" aria-pressed={language === 'en'} onClick={() => setLanguage('en')}>English</button>
+            </div>
+            <LegalPages satelliteTime={displayedSatelliteTime} embedded />
+            <button type="button" className="consent-settings-link" onClick={() => {
+              closePanel(); setConsentRequest((value) => value + 1)
+            }}>{t('Speichereinstellungen', 'Storage settings')}</button>
+            <h3>{mobileText('info')}</h3>
+          </>}
           <div className="info-box">
             <strong>{t('Hinweis', 'Note')}</strong>
             <p>
@@ -1127,13 +1303,16 @@ function App() {
               )}
             </p>
           </div>
+          </div>
+          </MobilePanel>
         </aside>
-        <div ref={mapElement} className="map" aria-label={t('Wetterkarte Europa', 'Europe weather map')} />
+        <div ref={mapElement} className="map" inert={mobile && !!activePanel} aria-label={t('Wetterkarte Europa', 'Europe weather map')} />
       </section>
-      <footer>
-        <LegalPages satelliteTime={displayedSatelliteTime} />
-        <PreferenceConsentControls />
-        {t(
+      <footer className="desktop-footer">
+        {!mobile && <LegalPages satelliteTime={displayedSatelliteTime} />}
+        <PreferenceConsentControls hideButton={mobile} openRequest={consentRequest}
+          suppressPrompt={mobile && activePanel === 'menu' && legalOpen} />
+        {!mobile && t(
           'Datenquellen: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Kartenbasis: OpenStreetMap',
           'Data sources: EUMETNET OPERA (CC BY 4.0) · Deutscher Wetterdienst · EUMETSAT · Open-Meteo · Map base: OpenStreetMap',
         )}

@@ -10,6 +10,8 @@ import { Fill, Stroke, Style, Text } from 'ol/style'
 import { unByKey } from 'ol/Observable'
 import { useLanguage } from './i18n'
 import { mergeWarningAreas } from './warningAreas'
+import { createEmpty, extend } from 'ol/extent'
+import { highestWarningLevel, warningsInExtent } from './warningViewport'
 
 type Warning = {
   identifier: string
@@ -73,13 +75,19 @@ function warningStyles(label: string) {
   })
 }
 
-export function WeatherWarnings({ map, visible, onChange, onDetails }: {
+export function WeatherWarnings({ map, visible, onChange, onDetails, onSummary, overviewRequest = 0,
+  detailsOnly = false, mobile = false, onShowOnMap }: {
   map: OlMap | null
   visible: boolean
   onChange: (visible: boolean) => void
   onDetails: () => void
+  onSummary?: (level: number | null) => void
+  overviewRequest?: number
+  detailsOnly?: boolean
+  mobile?: boolean
+  onShowOnMap?: () => void
 }) {
-  const { t, locale } = useLanguage()
+  const { t, locale, mobileText } = useLanguage()
   const [reload, setReload] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -87,6 +95,7 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
   const [selected, setSelected] = useState<Warning[]>([])
   const [fetchedAt, setFetchedAt] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [viewport, setViewport] = useState(0)
   const layer = useRef<VectorLayer<VectorSource<WarningFeature>> | null>(null)
   const areasLayer = useRef<VectorLayer<VectorSource<WarningFeature>> | null>(null)
   const detailsCallback = useRef(onDetails)
@@ -102,6 +111,45 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
   ][level] ?? t('Unbekannt', 'Unknown')
   const active = features.filter((feature) => Date.parse((feature.get('warning') as Warning).expires) > now)
   const count = new Set(active.map((feature) => (feature.get('warning') as Warning).identifier)).size
+  const inView = () => {
+    const extent = map?.getView().calculateExtent(map.getSize())
+    return extent ? warningsInExtent(features, extent, now) : []
+  }
+  const overview = useRef(inView)
+  overview.current = inView
+
+  useEffect(() => {
+    if (!map) return
+    const listener = map.on('moveend', () => setViewport((value) => value + 1))
+    const resize = map.on('change:size', () => setViewport((value) => value + 1))
+    return () => { unByKey(listener); unByKey(resize) }
+  }, [map])
+
+  useEffect(() => {
+    onSummary?.(visible && !error ? highestWarningLevel(overview.current()) : null)
+  }, [features, now, visible, error, viewport, map, onSummary])
+
+  useEffect(() => {
+    if (!overviewRequest) return
+    const warnings = new Map<string, Warning>()
+    for (const feature of overview.current()) {
+      const warning = feature.get('warning') as Warning
+      warnings.set(warning.identifier, warning)
+    }
+    setSelected([...warnings.values()].sort((a, b) => b.level - a.level))
+  }, [overviewRequest])
+
+  const showOnMap = (warning: Warning) => {
+    const extent = createEmpty()
+    for (const feature of features) {
+      if ((feature.get('warning') as Warning).identifier !== warning.identifier) continue
+      const geometry = feature.getGeometry()
+      if (geometry) extend(extent, geometry.getExtent())
+    }
+    if (!Number.isFinite(extent[0])) return
+    onShowOnMap?.()
+    map?.getView().fit(extent, { padding: [100, 65, 220, 30], maxZoom: 10, duration: 500 })
+  }
 
   useEffect(() => {
     if (!map || !visible) return
@@ -226,6 +274,7 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
 
   return (
     <div className="layer-group">
+      <div hidden={detailsOnly}>
       <p className="layer-group-title">{t('Wetterwarnungen', 'Weather warnings')}</p>
       <label className="layer-toggle">
         <input type="checkbox" checked={visible} onChange={(event) => onChange(event.target.checked)} />
@@ -233,6 +282,7 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
         <span><strong>{t('Warngebiete (Deutschland)', 'Warning areas (Germany)')}</strong>
           <small>{t('Eigene Darstellung · Originalwarntexte', 'Own presentation · original warning texts')}</small></span>
       </label>
+      </div>
       {visible && (
         <div className="warnings-panel">
           <p className="radar-range-note">{t(
@@ -240,10 +290,12 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
             'Own presentation based on weather warnings; not an official alert channel. Completeness and timeliness are not guaranteed. Please refer to the ',
           )}<a href="https://www.dwd.de/warnungen" target="_blank" rel="noreferrer">{t('offiziellen Warnungen', 'official warnings')}</a>
             {t(' des Deutschen Wetterdienstes.', ' issued by Deutscher Wetterdienst.')}</p>
+          <div hidden={detailsOnly}>
           <p className="radar-range-note">{t('Schraffierte Flächen mit gestricheltem Rand und „Wetterwarnung“ kennzeichnen aufbereitete Warngebiete, nicht die Regenintensität.', 'Hatched areas with dashed outlines and “Weather warning” labels indicate processed warning areas, not rainfall intensity.')}</p>
+          </div>
           {loading && <p role="status">{t('Warnungen werden geladen …', 'Loading warnings …')}</p>}
           {error && <p className="layer-error" role="alert">{t('Warnungen nicht verfügbar. Daraus lässt sich keine Warnfreiheit ableiten.', 'Warnings unavailable. This does not mean there are no warnings.')}</p>}
-          {!error && fetchedAt && <p role="status">
+          {!detailsOnly && !error && fetchedAt && <p role="status">
             {count ? t(`${count} Warnmeldungen · Gebiete anklicken für Details.`, `${count} warnings · click an area for details.`)
               : t('Keine Warnungen in dieser Darstellung. Daraus lässt sich keine Warnfreiheit ableiten.', 'No warnings in this presentation. This does not mean there are no warnings.')}
           </p>}
@@ -251,14 +303,14 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
           <button type="button" className="reload-button" onClick={() => setReload((value) => value + 1)}>
             {t('↻ Warnungen neu laden', '↻ Reload warnings')}
           </button>
-          <details>
+          <details hidden={detailsOnly}>
             <summary>{t('Warnstufen und Hinweise', 'Warning levels and notes')}</summary>
             {COLORS.slice(1).map((color, index) => <div className="warning-level" key={color}>
               <span style={{ backgroundColor: color }} /> {index + 1}: {levelName(index + 1)}
             </div>)}
             <p>{t('Nur Deutschland. Warntexte bleiben im deutschen Original. Farbige Flächen können auch bevorstehende Warnungen betreffen; Gültigkeit und Höhenangaben beachten.', 'Germany only. Warning texts remain in the original German. Coloured areas may also show upcoming warnings; check validity and altitude restrictions.')}</p>
           </details>
-          {selected.map((warning) => (
+          {(!mobile || detailsOnly) && selected.map((warning) => (
             <section className="warning-card" key={warning.identifier} aria-label={t('Warndetails', 'Warning details')}>
               <button type="button" className="station-card-close" aria-label={t('Warnung schließen', 'Close warning')}
                 onClick={() => setSelected((items) => items.filter((item) => item.identifier !== warning.identifier))}>×</button>
@@ -272,8 +324,13 @@ export function WeatherWarnings({ map, visible, onChange, onDetails }: {
               </p>}
               <p className="warning-original" lang="de">{warning.description}</p>
               {warning.instruction && <p className="warning-original" lang="de">{warning.instruction}</p>}
+              {mobile && <button type="button" className="reload-button" onClick={() => showOnMap(warning)}>{mobileText('showOnMap')}</button>}
             </section>
           ))}
+          {detailsOnly && !selected.length && !error && <p role="status">{t(
+            'Keine ausgewählten Warnungen mehr verfügbar. Daraus lässt sich keine Warnfreiheit ableiten.',
+            'Selected warnings are no longer available. This does not mean there are no warnings.',
+          )}</p>}
         </div>
       )}
     </div>

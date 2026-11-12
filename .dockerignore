@@ -9,6 +9,7 @@
 !scripts/
 !scripts/third-party-notices.mjs
 !scripts/source-release.mjs
+!scripts/app-assets.mjs
 !LICENSE
 !README.md
 !Dockerfile

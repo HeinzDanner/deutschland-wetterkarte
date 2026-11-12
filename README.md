@@ -50,10 +50,72 @@ Dienstbedingungen sind unter [Datenquellen und Lizenzen](#datenquellen-und-lizen
 | **Wetterwarnungen** | Eigene Darstellung auf Basis von DWD-Warnungen mit Schraffur, Schweregrad und Beschriftung; Originaltexte, Gültigkeit und lokale Zuordnung per Klick. Kein amtlicher Warnkanal. Die Warnabdeckung ist Deutschland, nicht ganz Europa. |
 | **Ortssuche** | Europäische Länderauswahl mit Deutschland als Vorauswahl, Ortsnamen sowie deutsche Postleitzahlen. Treffer zeigen Region und Land. |
 | **Punktvorhersage** | 24-Stunden-Verlauf und Sieben-Tage-Ausblick für Suchtreffer, Stationen oder Kartenklicks über Open-Meteo/DWD ICON, mit lokaler Zeitzone. Verfügbarkeit abhängig vom Datenanbieter. |
-| **Bedienung** | Deutsche und englische Oberfläche, responsive Kartenansicht, einklappbare mobile Bedienelemente und optional gespeicherte Karteneinstellungen. |
+| **Bedienung** | Deutsche und englische Oberfläche, eigene Mobile-Shell bis einschließlich 700 px mit Vollbild-Panels, schwebender Suche und gemeinsamem Timeline-Dock; optional gespeicherte Karteneinstellungen. |
 | **Transparenz** | Sichtbare Kartenattribution, Quellen-/Lizenzübersicht, Wetterhinweise und ausdrücklich gekennzeichnete Entwürfe für Impressum und Datenschutz. |
 
 Die geografische Abdeckung unterscheidet sich je nach Quelle. Eine europaweite Ortssuche bedeutet weder flächendeckende Radarversorgung noch europaweite Stations- oder Warnungsdaten.
+
+Radar, Satellit, Stationen und Warnungen sind standardmäßig eingeschaltet.
+Mit Einwilligung gespeicherte Ebeneneinstellungen haben weiterhin Vorrang.
+Auf dem Desktop scrollt die Seitenleiste bei einer Stations-, Kartenpunkt-,
+Suchtreffer- oder Warnflächenauswahl automatisch zum Detailbereich und hebt
+ihn kurz hervor. Die Karte selbst wird dadurch nicht verschoben.
+
+### Mobile Bedienung
+
+Bis einschließlich **700 px Fensterbreite** bleibt die Karte bildschirmfüllend,
+auch im Querformat. Die Suchleiste öffnet die Ortssuche; rechts öffnen die
+schwebenden Tasten Ebenen, den zuletzt gesteuerten Zeitlayer und das Menü.
+Suche, Ebenen, Vorhersage, Warnungsdetails und Menü teilen sich ein
+Vollbild-Panel mit Zurück-Pfeil. Zurück, Escape, der schmale abgedunkelte Rand
+oberhalb des Panels oder eine Abwärts-Wischgeste am Kopf schließen es.
+Der Tastaturfokus bleibt im geöffneten Panel.
+
+Das untere Dock steuert Radar bzw. Satellit; bei zwei aktiven Ebenen wechselt
+man über die beschrifteten Tasten zwischen den Zeitlisten. Das Schließen im
+Dock deaktiviert nur die gesteuerte Ebene. Synchronisation bleibt über das
+Ebenen-Panel verfügbar; dann steuern beide Dock-Tasten dieselben gemeinsamen
+Zeitpunkte. Deckkraft und Quellenhinweise bleiben im Ebenen- bzw. Menü-Panel.
+Panelwechsel unterbrechen weder Wiedergabe noch Vorladen oder Kartenzustand.
+Radar- und Satellitenzeitlisten werden alle fünf Minuten geprüft
+(Satellitenaufnahmen weiterhin in 15-Minuten-Abständen); die ausgewählte
+verfügbare Bildzeit bleibt bei Aktualisierungen erhalten.
+
+Der Warn-Chip zeigt die höchste **bereits gültige** Warnstufe im aktuellen
+Kartenausschnitt, sofern Warnungen eingeschaltet und erfolgreich geladen sind.
+Bevorstehende Warnungen bleiben auf der Karte sichtbar, zählen aber noch nicht
+zum Chip. Ein fehlender Chip ist **keine Entwarnung**. Stations- und
+Warnflächenklicks öffnen ihre Details; „Auf Karte zeigen“ führt zur Position.
+Offene Panels und Dock-Auswahl werden nicht gespeichert. Oberhalb von 700 px
+bleibt die bisherige Desktop-Bedienung erhalten.
+
+### Eigener Standort (optional)
+
+Die Zieltaste ermittelt erst nach Hinweisbestätigung und Browserberechtigung
+einmalig den Standort (HTTPS oder localhost erforderlich). Ein blauer Punkt
+markiert die ungefähre Position; keine laufende Ortung, Adressauflösung oder
+automatische Wetterabfrage. „Standort ausblenden“ entfernt den Punkt.
+Nach erfolgreicher Ortung bleibt die Speicherung des Kartenausschnitts für
+den Rest dieses Besuchs ausgesetzt, einschließlich Speichern beim Verlassen;
+vorher gespeicherte Ansichten bleiben erhalten. Position und Sperre werden
+nicht persistiert. Karten-/Satellitenabrufe können den ungefähren Standort
+indirekt offenlegen; der DE/EN-Hinweis und der Datenschutzentwurf erläutern
+dies. Die Ergänzung ist keine rechtliche Freigabe.
+
+### Zum Startbildschirm hinzufügen
+
+Im mobilen Menü bietet „Als App hinzufügen“ den vom Browser bereitgestellten
+Installationsdialog an. Ist dieser nicht verfügbar, erscheint eine Anleitung
+für das Browsermenü bzw. Safari auf iPhone/iPad. Die Installation benötigt
+immer eine Bestätigung durch den Nutzer und hängt von Browser und Plattform
+ab; sie kann nicht automatisch erzwungen werden. Bereits im eigenständigen
+App-Fenster erscheint stattdessen ein Statushinweis.
+
+Manifest und eigene PNG-Symbole (180/192/512 px) werden durch
+`scripts/app-assets.mjs` vor Entwicklungsstart und Produktionsbuild erzeugt,
+auch im Docker-Build. Kein Service Worker, Offline-Cache, Push oder
+Installations-Tracking wird hinzugefügt. Wetterdaten benötigen weiterhin eine
+Internetverbindung; vorhandene Datenschutzbedingungen bleiben maßgeblich.
 
 ## Architektur
 
@@ -283,6 +345,11 @@ Sprache, Kartenausschnitt und Ebeneneinstellungen werden nur nach Zustimmung im 
 Impressum und Datenschutz sind über die Anwendung erreichbar, aber **ausdrücklich Entwürfe**. Betreiberangaben in `src/legalConfig.ts` sind öffentlich ausgelieferte Inhalte – dort gehören keine Zugangsdaten oder privaten Steuernummern hinein.
 
 Diese Karte ist **kein amtlicher Warnkanal oder Notfalldienst**. Daten können verspätet, unvollständig oder nicht verfügbar sein. Für sicherheitsrelevante Entscheidungen sind die amtlichen Originalwarnungen maßgeblich. Satelliten-Infrarot zeigt keine Regenintensität; transparente Radarbereiche garantieren keine Niederschlagsfreiheit.
+
+Sind beim OPERA-Anbieter keine Radarbilder innerhalb des Vier-Stunden-Fensters
+verfügbar, zeigt die App einen eigenen Verfügbarkeitshinweis und prüft
+automatisch erneut. Veraltete Bilder werden nicht als aktuelle Daten
+ausgegeben; Netzwerk- und Bildladefehler bleiben davon getrennt.
 
 ## Betriebshinweise
 

@@ -57,11 +57,16 @@ export function usePreferenceConsent() {
   return value
 }
 
-export function PreferenceConsentControls() {
+export function PreferenceConsentControls({ hideButton = false, openRequest = 0, suppressPrompt = false }: {
+  hideButton?: boolean
+  openRequest?: number
+  suppressPrompt?: boolean
+}) {
   const { choice, decide } = usePreferenceConsent()
   const { t } = useLanguage()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState(false)
+  useEffect(() => { if (openRequest) setOpen(true) }, [openRequest])
   function choose(next: ConsentChoice) {
     if (decide(next)) {
       setError(false)
@@ -71,10 +76,10 @@ export function PreferenceConsentControls() {
     }
   }
   return <>
-    <button className="consent-settings-link" type="button" onClick={() => setOpen(true)}>
+    {!hideButton && <button className="consent-settings-link" type="button" onClick={() => setOpen(true)}>
       {t('Speichereinstellungen', 'Storage settings')}
-    </button>
-    {(choice === null || open) && <section className="consent-panel" role="region"
+    </button>}
+    {!suppressPrompt && (choice === null || open) && <section className="consent-panel" role="region"
       aria-labelledby="consent-title">
       <h2 id="consent-title">{t('Einstellungen auf diesem Gerät speichern?', 'Save preferences on this device?')}</h2>
       <p>{t(

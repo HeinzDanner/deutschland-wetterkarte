@@ -4,7 +4,7 @@ export const MAP_VIEW_KEY = 'weather-map-view'
 export const MAP_LAYERS_KEY = 'weather-map-layers'
 export const DEFAULT_VIEW = { center: [10.5, 51.5], zoom: 4.6 }
 export const DEFAULT_LAYERS = {
-  opera: true, satellite: false, stations: false, warnings: true, satelliteOpacity: 0.95,
+  opera: true, satellite: true, stations: true, warnings: true, satelliteOpacity: 0.95,
 }
 
 export function validView(value: unknown): value is typeof DEFAULT_VIEW {
