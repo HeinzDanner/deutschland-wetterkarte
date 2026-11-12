@@ -1,7 +1,8 @@
 import { fromArrayBuffer } from 'geotiff'
 import { PNG } from 'pngjs'
 
-const BASE = 'https://s3.waw3-1.cloudferro.com/openradar-24h'
+const PRIMARY = 'https://s3.waw3-1.cloudferro.com/openradar-24h'
+const BACKUP = 'https://object-store.os-api.cci1.ecmwf.int/openradar-24h-backup'
 export const OPERA_PROJECTION = '+proj=laea +lat_0=55 +lon_0=10 +x_0=1950000 +y_0=-2100000 +ellps=WGS84 +units=m +no_defs'
 export const OPERA_COLORS = [
   [0.1, [103, 210, 235]], [0.5, [50, 180, 125]], [1, [30, 145, 65]],
@@ -28,23 +29,23 @@ const frames = new Map()
 let running = 0
 const queue = []
 
-async function fetchChecked(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(45000) })
+async function fetchChecked(url, timeout = 45000) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(timeout) })
   if (!response.ok) throw new Error(`OPERA-Datenquelle antwortet mit HTTP ${response.status}.`)
   return response
 }
 
-async function listDay(day) {
+async function listDay(base, day) {
   const prefix = `${day.replaceAll('-', '/')}/OPERA/COMP/`
   const keys = []
   let continuation
   do {
-    const url = new URL(BASE)
+    const url = new URL(base)
     url.searchParams.set('list-type', '2')
     url.searchParams.set('prefix', prefix)
     url.searchParams.set('max-keys', '1000')
     if (continuation) url.searchParams.set('continuation-token', continuation)
-    const xml = await (await fetchChecked(url)).text()
+    const xml = await (await fetchChecked(url, 10000)).text()
     for (const match of xml.matchAll(/<Key>([^<]+@RATE\.tiff)<\/Key>/g)) {
       keys.push(match[1])
     }
@@ -62,25 +63,44 @@ export async function getOperaFrames() {
     const yesterday = new Date(now.getTime() - 86400000)
     const days = [now.toISOString().slice(0, 10)]
     if (now.getUTCHours() < 4) days.unshift(yesterday.toISOString().slice(0, 10))
-    const keys = (await Promise.all(days.map(listDay))).flat().sort()
-    const available = keys.map((key) => {
-      const stamp = key.match(/OPERA@(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})@0@RATE\.tiff$/)
-      if (!stamp) return null
-      return {
-        time: `${stamp[1]}-${stamp[2]}-${stamp[3]}T${stamp[4]}:${stamp[5]}:00.000Z`,
-        key,
+    async function readSource(base) {
+      const keys = (await Promise.all(days.map((day) => listDay(base, day)))).flat().sort()
+      const available = keys.map((key) => {
+        const stamp = key.match(/OPERA@(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})@0@RATE\.tiff$/)
+        if (!stamp) return null
+        return {
+          time: `${stamp[1]}-${stamp[2]}-${stamp[3]}T${stamp[4]}:${stamp[5]}:00.000Z`,
+          key,
+        }
+      }).filter((frame) => frame && Date.parse(frame.time) >= now.getTime() - 4 * 3600000 &&
+        Date.parse(frame.time) <= now.getTime()).slice(-13)
+      if (!available.length) throw new Error('Keine aktuellen OPERA-Niederschlagsbilder verfügbar.')
+      return available
+    }
+    let base = PRIMARY
+    let available
+    try {
+      available = await readSource(PRIMARY)
+    } catch (reason) {
+      console.warn('OPERA-Hauptquelle nicht verfügbar, versuche Backup:', reason.message)
+      base = BACKUP
+      try {
+        available = await readSource(BACKUP)
+      } catch (backupReason) {
+        console.warn('OPERA-Backup ebenfalls nicht verfügbar:', backupReason.message)
+        if (reason.message === 'Keine aktuellen OPERA-Niederschlagsbilder verfügbar.' &&
+          backupReason.message === reason.message) throw backupReason
+        throw new Error('OPERA-Hauptquelle und Backup sind nicht verfügbar.')
       }
-    }).filter((frame) => frame && Date.parse(frame.time) >= now.getTime() - 4 * 3600000)
-      .slice(-13)
-    if (!available.length) throw new Error('Keine aktuellen OPERA-Niederschlagsbilder verfügbar.')
+    }
     const data = {
       frames: available.map((frame) => frame.time),
       latest: available.at(-1).time,
       colors: OPERA_COLORS,
     }
-    indexCache = { at: Date.now(), data, available }
-    for (const time of frames.keys()) {
-      if (!data.frames.includes(time)) frames.delete(time)
+    indexCache = { at: Date.now(), data, available, base }
+    for (const cacheKey of frames.keys()) {
+      if (!available.some((frame) => cacheKey === `${base}|${frame.time}`)) frames.delete(cacheKey)
     }
     return data
   })()
@@ -91,12 +111,19 @@ export async function getOperaFrames() {
   }
 }
 
-async function convertFrame(key) {
+async function convertFrame(base, key) {
   // Bound simultaneous decompression/PNG encoding, not just network requests.
   if (running >= 2) await new Promise((resolve) => queue.push(resolve))
   running += 1
   try {
-    const response = await fetchChecked(`${BASE}/${key}`)
+    let response
+    try {
+      response = await fetchChecked(`${base}/${key}`)
+    } catch (reason) {
+      const alternate = base === PRIMARY ? BACKUP : PRIMARY
+      console.warn('OPERA-Bildabruf fehlgeschlagen, versuche andere Quelle:', reason.message)
+      response = await fetchChecked(`${alternate}/${key}`)
+    }
     const tiff = await fromArrayBuffer(await response.arrayBuffer())
     const image = await tiff.getImage()
     const geo = image.getGeoKeys()
@@ -138,12 +165,14 @@ export async function getOperaFrame(time) {
     error.status = 404
     throw error
   }
-  if (!frames.has(time)) {
-    const pending = convertFrame(entry.key)
-    frames.set(time, pending)
+  const base = indexCache.base
+  const cacheKey = `${base}|${time}`
+  if (!frames.has(cacheKey)) {
+    const pending = convertFrame(base, entry.key)
+    frames.set(cacheKey, pending)
     pending.catch(() => {
-      if (frames.get(time) === pending) frames.delete(time)
+      if (frames.get(cacheKey) === pending) frames.delete(cacheKey)
     })
   }
-  return frames.get(time)
+  return frames.get(cacheKey)
 }

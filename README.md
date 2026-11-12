@@ -355,6 +355,17 @@ verfügbar, zeigt die App einen eigenen Verfügbarkeitshinweis und prüft
 automatisch erneut. Veraltete Bilder werden nicht als aktuelle Daten
 ausgegeben; Netzwerk- und Bildladefehler bleiben davon getrennt.
 
+Der Server prüft zuerst den regulären OPERA-24-Stunden-Speicher. Ist dieser
+nicht erreichbar oder enthält keine aktuellen Niederschlagsbilder, verwendet
+er den von OPERA für die Störung bereitgestellten Backup-Speicher
+`object-store.os-api.cci1.ecmwf.int/openradar-24h-backup`. Bildzeitpunkte
+und Bildabrufe stammen zunächst aus derselben Quelle; bei einem fehlgeschlagenen
+Bildabruf wird derselbe Zeitpunkt zusätzlich in der anderen Quelle versucht.
+Nach Ablauf des einminütigen Index-Caches wird die Hauptquelle erneut geprüft.
+Sind beide Quellen nicht verfügbar, wird ein Fehler angezeigt und protokolliert.
+Der Backup-Zugang ist laut OPERA vorübergehend und muss bei späteren
+Ankündigungen überprüft werden.
+
 ## Betriebshinweise
 
 Die App ist ein ergänzendes Informationsangebot ohne Verfügbarkeitszusage.
