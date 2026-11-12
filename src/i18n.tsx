@@ -15,6 +15,8 @@ const mobileMessages = {
   menu: ['Mehr', 'More'],
   timeLayers: ['Radar / Satellit', 'Radar / satellite'],
   timeline: ['Zeitleiste', 'Timeline'],
+  synchronize: ['Synchron', 'Sync'],
+  synchronizePlayback: ['Radar und Satellit synchron abspielen', 'Play radar and satellite in sync'],
   radar: ['Radar', 'Radar'],
   satellite: ['Satellit', 'Satellite'],
   play: ['Abspielen', 'Play'],

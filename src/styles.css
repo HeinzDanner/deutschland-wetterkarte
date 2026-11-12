@@ -928,10 +928,27 @@ footer {
   }
 
   .map .ol-attribution {
-    bottom: max(2px, env(safe-area-inset-bottom));
-    right: max(2px, env(safe-area-inset-right));
+    bottom: env(safe-area-inset-bottom);
+    right: env(safe-area-inset-right);
     max-width: calc(100% - 8px - env(safe-area-inset-left) - env(safe-area-inset-right));
     font-size: 9px;
+  }
+
+  .map .ol-attribution button {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    font-size: 12px;
+    border-radius: 50%;
+  }
+
+  .map .ol-attribution.ol-collapsed {
+    background: transparent;
+    padding: 0;
+  }
+
+  .map .ol-attribution.ol-collapsed button {
+    background: radial-gradient(circle, #0b1f33 0 10px, transparent 11px);
   }
 
   .map .ol-attribution a {
@@ -975,21 +992,22 @@ footer {
 
   .mobile-search-area {
     position: absolute;
-    top: calc(12px + env(safe-area-inset-top));
-    left: max(16px, env(safe-area-inset-left));
-    right: max(16px, env(safe-area-inset-right));
+    top: calc(4px + env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
   }
 
   .mobile-floating .mobile-search-pill {
-    width: min(100%, 440px);
-    min-height: 48px;
-    border-radius: 28px;
+    width: min(88%, 360px);
+    min-height: 44px;
+    border-radius: 24px;
     text-align: left;
-    padding: 0 20px;
+    padding: 0 14px;
+    font-size: 0.88rem;
     box-shadow: 0 3px 14px #0005;
     background: #102a40ed;
   }
@@ -1167,14 +1185,14 @@ footer {
 
   .timeline-dock {
     position: absolute;
-    bottom: calc(8px + var(--map-attribution-height, 44px) + env(safe-area-inset-bottom));
-    left: max(12px, env(safe-area-inset-left));
-    right: max(12px, env(safe-area-inset-right));
-    max-width: 500px;
+    bottom: calc(2px + var(--map-attribution-height, 44px) + env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    max-width: 420px;
     margin: 0 auto;
     border: 1px solid #54718a;
-    border-radius: 18px;
-    padding: 6px 10px;
+    border-radius: 14px;
+    padding: 2px 6px;
     background: #102a40ed;
     box-shadow: 0 4px 20px #0006;
   }
@@ -1187,13 +1205,13 @@ footer {
   }
 
   .timeline-dock-heading { justify-content: space-between; }
-  .timeline-dock-heading > div { display: flex; gap: 6px; }
-  .timeline-dock-heading button { background: transparent; border-color: transparent; padding: 0 10px; font-size: 0.85rem; }
+  .timeline-dock-heading > div { display: flex; gap: 2px; }
+  .timeline-dock-heading button { background: transparent; border-color: transparent; padding: 0 6px; font-size: 0.78rem; }
   .timeline-dock-heading button[aria-pressed='true'] { background: #2c5873; }
-  .timeline-dock-controls button { width: 48px; height: 48px; flex-shrink: 0; }
+  .timeline-dock-controls button { width: 44px; height: 44px; flex-shrink: 0; }
   .timeline-dock-controls time,
   .timeline-dock-controls > span { margin-left: auto; font-size: 0.75rem; text-align: right; }
-  .timeline-dock input { accent-color: #48b9df; min-height: 44px; width: 100%; margin: 0; }
+  .timeline-dock input { display: block; accent-color: #48b9df; min-height: 44px; width: 100%; margin: 0; }
   .timeline-dock-status { display: block; min-height: 1em; font-size: 0.7rem; color: #afc1cf; }
   .timeline-dock-error { font-size: 0.75rem; color: #f5b3a9; display: flex; align-items: center; gap: 8px; max-height: 112px; overflow-y: auto; }
   .timeline-dock-error button { font-size: 0.75rem; flex-shrink: 0; }

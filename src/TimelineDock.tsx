@@ -3,12 +3,14 @@ import type { LayerPlayback } from './useLayerPlayback'
 
 export type TimeLayer = 'radar' | 'satellite'
 
-export function TimelineDock({ active, radar, satellite, onSelect, onClose }: {
+export function TimelineDock({ active, radar, satellite, onSelect, onClose, synchronized, onSynchronize }: {
   active: TimeLayer | null
   radar: LayerPlayback | null
   satellite: LayerPlayback | null
   onSelect: (layer: TimeLayer) => void
   onClose: (layer: TimeLayer) => void
+  synchronized: boolean
+  onSynchronize: (enabled: boolean) => void
 }) {
   const { mobileText, locale } = useLanguage()
   const playback = active === 'radar' ? radar : active === 'satellite' ? satellite : null
@@ -20,6 +22,10 @@ export function TimelineDock({ active, radar, satellite, onSelect, onClose }: {
         {radar && <button type="button" aria-pressed={active === 'radar'} onClick={() => onSelect('radar')}>{mobileText('radar')}</button>}
         {satellite && <button type="button" aria-pressed={active === 'satellite'} onClick={() => onSelect('satellite')}>{mobileText('satellite')}</button>}
       </div>
+      <button type="button" className="timeline-sync" aria-pressed={synchronized}
+        aria-label={mobileText('synchronizePlayback')} onClick={() => onSynchronize(!synchronized)}>
+        {mobileText('synchronize')}
+      </button>
       <button type="button" onClick={() => onClose(active)} aria-label={mobileText('closeLayer')}>×</button>
     </div>
     <div className="timeline-dock-controls">
@@ -36,6 +42,6 @@ export function TimelineDock({ active, radar, satellite, onSelect, onClose }: {
       aria-label={mobileText(active === 'radar' ? 'radarTime' : 'satelliteTime')} />
     {error ? <div className="timeline-dock-error" role="alert"><span>{error}</span>
       <button type="button" onClick={reload}>{mobileText('retry')}</button></div>
-      : <span className="timeline-dock-status" role="status">{loading ? mobileText('loading') : ''}</span>}
+      : loading && <span className="timeline-dock-status" role="status">{mobileText('loading')}</span>}
   </section>
 }

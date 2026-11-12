@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Feature from 'ol/Feature'
 import Map from 'ol/Map'
 import View from 'ol/View'
+import Attribution from 'ol/control/Attribution'
+import { defaults as defaultControls } from 'ol/control/defaults'
 import TileLayer from 'ol/layer/Tile'
 import VectorLayer from 'ol/layer/Vector'
 import Point from 'ol/geom/Point'
@@ -185,6 +187,16 @@ function App() {
   const syncIndex = commonTimes.length ? retainedRadarIndex(commonTimes, syncSelected ?? undefined) : -1
   const syncTime = commonTimes[syncIndex] ?? null
   const syncActive = synchronized && operaVisible && satelliteVisible
+  const synchronizePlayback = (enabled: boolean) => {
+    setSynchronized(enabled)
+    setSyncPlaying(false)
+    if (enabled) {
+      setOperaVisible(true)
+      setRadarVisible(false)
+      setSatelliteVisible(true)
+      setSyncSelected(null)
+    }
+  }
   const opera = useOperaRadar({
     map: mapReady ? map.current : null, active: operaVisible, synchronized: syncActive,
     synchronizedTime: syncTime, onFrames: setOperaFrames, onStatus: setOperaStatus,
@@ -341,6 +353,9 @@ function App() {
 
     map.current = new Map({
       target: mapElement.current,
+      controls: defaultControls({ attribution: false }).extend([
+        new Attribution({ collapsible: false }),
+      ]),
       layers: [baseLayer, satelliteLayer.current, radarLayer.current, stationLayer.current],
       view: new View({
         center: fromLonLat(initialView.center),
@@ -432,6 +447,15 @@ function App() {
     attributionButton?.setAttribute('aria-label', labels.attribution)
     attributionButton?.setAttribute('title', labels.attribution)
   }, [mapReady, language])
+
+  useEffect(() => {
+    if (!mapReady) return
+    for (const control of map.current?.getControls().getArray() ?? []) {
+      if (!(control instanceof Attribution)) continue
+      control.setCollapsible(mobile)
+      control.setCollapsed(mobile)
+    }
+  }, [mobile, mapReady])
 
   useEffect(() => {
     if (!mobile || !mapReady) return
@@ -808,6 +832,7 @@ function App() {
             <button type="button" aria-label={mobileText('menu')} title={mobileText('menu')} onClick={() => setActivePanel('menu')}>⋯</button>
           </div>
           <TimelineDock active={activeTimeline}
+            synchronized={syncActive} onSynchronize={synchronizePlayback}
             radar={operaVisible ? syncActive ? syncPlayback : opera.playback : null}
             satellite={satelliteVisible ? syncActive ? syncPlayback : satellitePlayback : null}
             onSelect={setActiveTimeline} onClose={(layer) => {
@@ -1124,14 +1149,7 @@ function App() {
           <div className="layer-group">
             <label className="layer-toggle">
               <input type="checkbox" checked={syncActive} onChange={(event) => {
-                setSynchronized(event.target.checked)
-                setSyncPlaying(false)
-                if (event.target.checked) {
-                  setOperaVisible(true)
-                  setRadarVisible(false)
-                  setSatelliteVisible(true)
-                  setSyncSelected(null)
-                }
+                synchronizePlayback(event.target.checked)
               }} />
               <span className="toggle-track" />
               <span><strong>{t('Radar & Satellit synchron', 'Synchronize radar & satellite')}</strong>

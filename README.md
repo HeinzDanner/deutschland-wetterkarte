@@ -74,7 +74,7 @@ Der Tastaturfokus bleibt im geöffneten Panel.
 Das untere Dock steuert Radar bzw. Satellit; bei zwei aktiven Ebenen wechselt
 man über die beschrifteten Tasten zwischen den Zeitlisten. Das Schließen im
 Dock deaktiviert nur die gesteuerte Ebene. Synchronisation bleibt über das
-Ebenen-Panel verfügbar; dann steuern beide Dock-Tasten dieselben gemeinsamen
+Ebenen-Panel und direkt über „Synchron“ im Dock verfügbar; dann steuern beide Dock-Tasten dieselben gemeinsamen
 Zeitpunkte. Deckkraft und Quellenhinweise bleiben im Ebenen- bzw. Menü-Panel.
 Panelwechsel unterbrechen weder Wiedergabe noch Vorladen oder Kartenzustand.
 Radar- und Satellitenzeitlisten werden alle fünf Minuten geprüft
@@ -88,6 +88,10 @@ zum Chip. Ein fehlender Chip ist **keine Entwarnung**. Stations- und
 Warnflächenklicks öffnen ihre Details; „Auf Karte zeigen“ führt zur Position.
 Offene Panels und Dock-Auswahl werden nicht gespeichert. Oberhalb von 700 px
 bleibt die bisherige Desktop-Bedienung erhalten.
+
+Mobil sind die Kartenquellen ganz unten über das kleine Info-Symbol
+aufklappbar. Das kompakte Dock liegt darüber und weicht den aufgeklappten
+Quellen aus; auf dem Desktop bleiben die Quellen dauerhaft sichtbar.
 
 ### Eigener Standort (optional)
 
