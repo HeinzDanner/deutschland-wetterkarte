@@ -1,5 +1,6 @@
 const ENDPOINT = 'https://maps.dwd.de/geoserver/ows'
 const LEVELS = { Minor: 1, Moderate: 2, Severe: 3, Extreme: 4 }
+const PAGE_SIZE = 2000
 let cached
 let pending
 
@@ -45,13 +46,15 @@ export async function getWarnings() {
     const features = []
     let start = 0
     const signal = AbortSignal.timeout(60000)
+    const expiresAfter = new Date().toISOString()
+    const filter = `STATUS = 'Actual' AND SCOPE = 'Public' AND (MSGTYPE IS NULL OR MSGTYPE <> 'Cancel') AND EXPIRES > '${expiresAfter}'`
     while (true) {
       const url = new URL(ENDPOINT)
       for (const [name, value] of Object.entries({
         service: 'WFS', version: '2.0.0', request: 'GetFeature',
         typeNames: 'dwd:Warnungen_Gemeinden', outputFormat: 'application/json',
-        srsName: 'EPSG:4326', count: '500', startIndex: String(start),
-        sortBy: 'IDENTIFIER',
+        srsName: 'EPSG:4326', count: String(PAGE_SIZE), startIndex: String(start),
+        sortBy: 'IDENTIFIER,WARNCELLID,LANGUAGE', CQL_FILTER: filter,
       })) url.searchParams.set(name, value)
       const response = await fetch(url, { signal })
       if (!response.ok) throw new Error(`DWD-Warnungen: HTTP ${response.status}`)
@@ -61,8 +64,11 @@ export async function getWarnings() {
       }
       features.push(...data.features)
       start += data.features.length
-      if (data.features.length < 500) break
-      if (start >= 20000) throw new Error('DWD-Warnungen überschreiten die unterstützte Datenmenge.')
+      const total = data.numberMatched ?? data.totalFeatures
+      if (!data.features.length && Number.isSafeInteger(total) && start < total) {
+        throw new Error('DWD-Warnungen: unvollständige Seitennavigation.')
+      }
+      if (data.features.length < PAGE_SIZE && (!Number.isSafeInteger(total) || start >= total)) break
     }
     const now = Date.now()
     const data = {

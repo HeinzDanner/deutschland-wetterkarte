@@ -22,8 +22,12 @@ test('accepts default and saved map views but rejects invalid coordinates and zo
 test('validates all layer switches and opacity without interpreting strings as booleans', () => {
   assert.ok(validLayers(DEFAULT_LAYERS))
   assert.ok(validLayers({ ...DEFAULT_LAYERS, warnings: false, satelliteOpacity: 0.4 }))
+  const { radarOpacity, ...legacyLayers } = DEFAULT_LAYERS
+  assert.ok(validLayers(legacyLayers))
+  assert.ok(validLayers({ ...legacyLayers, radarOpacity: 0 }))
   for (const value of [null, {}, { ...DEFAULT_LAYERS, opera: 'false' },
-    { ...DEFAULT_LAYERS, satelliteOpacity: null }, { ...DEFAULT_LAYERS, satelliteOpacity: 1.1 }]) {
+    { ...DEFAULT_LAYERS, satelliteOpacity: null }, { ...DEFAULT_LAYERS, satelliteOpacity: 1.1 },
+    { ...DEFAULT_LAYERS, radarOpacity: null }, { ...DEFAULT_LAYERS, radarOpacity: 1.1 }]) {
     assert.equal(validLayers(value), false)
   }
 })

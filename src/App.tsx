@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import Feature from 'ol/Feature'
 import Map from 'ol/Map'
 import View from 'ol/View'
@@ -33,6 +34,7 @@ import { PreferenceConsentControls, usePreferenceConsent } from './PreferenceCon
 import { DEFAULT_VIEW, DEFAULT_LAYERS, MAP_VIEW_KEY, MAP_LAYERS_KEY, readPreference, savePreference, validView, validLayers } from './mapPreferences'
 import { MobilePanel, type PanelName } from './MobilePanel'
 import { TimelineDock, type TimeLayer } from './TimelineDock'
+import { LayerOpacity } from './LayerOpacity'
 import { useMobile } from './useMobile'
 import { useLayerPlayback, type LayerPlayback } from './useLayerPlayback'
 import { LocateControl } from './LocateControl'
@@ -40,6 +42,10 @@ import { InstallApp } from './InstallApp'
 import './map.css'
 
 const DWD_RADAR_FALLBACK_ENABLED = false
+const DEFAULT_PANEL_WIDTH = 280
+const MIN_PANEL_WIDTH = 260
+const maxPanelWidth = () => Math.min(600, Math.floor(document.documentElement.clientWidth / 2))
+const clampPanelWidth = (width: number, max: number) => Math.min(max, Math.max(MIN_PANEL_WIDTH, width))
 const DWD_WMS_URL = 'https://maps.dwd.de/geoserver/ows'
 const RADAR_LAYER = 'dwd:Niederschlagsradar'
 const RADAR_LEGEND_URL =
@@ -76,10 +82,21 @@ function clipLayerToGermany(layer: ImageLayer<ImageWMS>, outside: boolean) {
 function App() {
   const { choice } = usePreferenceConsent()
   const [initialView] = useState(() => readPreference(MAP_VIEW_KEY, DEFAULT_VIEW, validView))
-  const [initialLayers] = useState(() => readPreference(MAP_LAYERS_KEY, DEFAULT_LAYERS, validLayers))
+  const [initialLayers] = useState(() => ({
+    ...DEFAULT_LAYERS, ...readPreference(MAP_LAYERS_KEY, DEFAULT_LAYERS, validLayers),
+  }))
   const [warningsVisible, setWarningsVisible] = useState(initialLayers.warnings)
   const { language, locale, t, setLanguage, mobileText } = useLanguage()
   const mobile = useMobile()
+  const [preferredPanelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
+  const [panelMax, setPanelMax] = useState(maxPanelWidth)
+  const panelWidth = clampPanelWidth(preferredPanelWidth, panelMax)
+  const panelDrag = useRef<{ pointerId: number; x: number; width: number } | null>(null)
+  useEffect(() => {
+    const update = () => setPanelMax(maxPanelWidth())
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
   const [activePanel, setActivePanel] = useState<PanelName | null>(null)
   const [detailRequest, setDetailRequest] = useState<{ selector: string } | null>(null)
   const revealDetails = useCallback((kind: 'forecast' | 'warning') => {
@@ -149,6 +166,7 @@ function App() {
   const satelliteLayer = useRef<ImageLayer<ImageWMS> | null>(null)
   const [satelliteVisible, setSatelliteVisible] = useState(initialLayers.satellite)
   const [satelliteOpacity, setSatelliteOpacity] = useState(initialLayers.satelliteOpacity)
+  const [radarOpacity, setRadarOpacity] = useState(initialLayers.radarOpacity)
   const [satelliteFrames, setSatelliteFrames] = useState<string[]>([])
   const [satelliteFrameIndex, setSatelliteFrameIndex] = useState(0)
   const [satelliteError, setSatelliteError] = useState<string | null>(null)
@@ -198,7 +216,7 @@ function App() {
     }
   }
   const opera = useOperaRadar({
-    map: mapReady ? map.current : null, active: operaVisible, synchronized: syncActive,
+    map: mapReady ? map.current : null, active: operaVisible, opacity: radarOpacity, synchronized: syncActive,
     synchronizedTime: syncTime, onFrames: setOperaFrames, onStatus: setOperaStatus,
   })
   const satelliteSelection = useRef({ frames: satelliteFrames, index: satelliteFrameIndex })
@@ -255,9 +273,9 @@ function App() {
   useEffect(() => {
     savePreference(MAP_LAYERS_KEY, {
       opera: operaVisible, satellite: satelliteVisible, stations: stationsVisible,
-      warnings: warningsVisible, satelliteOpacity,
+      warnings: warningsVisible, satelliteOpacity, radarOpacity,
     })
-  }, [operaVisible, satelliteVisible, stationsVisible, warningsVisible, satelliteOpacity, choice])
+  }, [operaVisible, satelliteVisible, stationsVisible, warningsVisible, satelliteOpacity, radarOpacity, choice])
 
   useEffect(() => {
     if (privateMapView.current || choice !== 'accepted' || !map.current) return
@@ -777,6 +795,9 @@ function App() {
     })
   }
 
+  const radarOpacityControl = <LayerOpacity layer="radar" value={radarOpacity} onChange={setRadarOpacity} />
+  const satelliteOpacityControl = <LayerOpacity layer="satellite" value={satelliteOpacity} onChange={setSatelliteOpacity} />
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -808,7 +829,7 @@ function App() {
         </div>
       </header>
 
-      <section className="content">
+      <section className="content" style={{ '--control-panel-width': `${panelWidth}px` } as CSSProperties}>
         <LocateControl map={mapReady ? map.current : null} blocked={mobile && !!activePanel} onLocated={protectLocation} />
         {mobile && <div className="mobile-floating" inert={!!activePanel}>
           <div className="mobile-search-area">
@@ -833,6 +854,10 @@ function App() {
           </div>
           <TimelineDock active={activeTimeline}
             synchronized={syncActive} onSynchronize={synchronizePlayback}
+            opacityControls={<>
+              {(syncActive || activeTimeline === 'radar') && radarOpacityControl}
+              {(syncActive || activeTimeline === 'satellite') && satelliteOpacityControl}
+            </>}
             radar={operaVisible ? syncActive ? syncPlayback : opera.playback : null}
             satellite={satelliteVisible ? syncActive ? syncPlayback : satellitePlayback : null}
             onSelect={setActiveTimeline} onClose={(layer) => {
@@ -875,6 +900,7 @@ function App() {
               }
             }}
           />
+          {operaVisible && !syncActive && radarOpacityControl}
           {DWD_RADAR_FALLBACK_ENABLED && <div className="layer-group">
             <p className="layer-group-title">{t('Aktive Wetterdaten', 'Live weather data')}</p>
             <label className="layer-toggle">
@@ -1110,18 +1136,7 @@ function App() {
                     </div>
                   </>
                 )}
-                <label className="satellite-opacity">
-                  <span>{t('Deckkraft', 'Opacity')}</span>
-                  <input
-                    aria-label={t('Deckkraft der Satellitenwolken', 'Satellite cloud opacity')}
-                    max={1}
-                    min={0.2}
-                    onChange={(event) => setSatelliteOpacity(Number(event.target.value))}
-                    step={0.05}
-                    type="range"
-                    value={satelliteOpacity}
-                  />
-                </label>
+                {!syncActive && satelliteOpacityControl}
                 {satelliteError && <p className="layer-error">{t('Satellitendaten konnten nicht geladen werden.', 'Could not load satellite data.')}</p>}
                 {satelliteImageError && <p className="layer-error" role="alert">{t('Satellitenbild konnte nicht geladen werden.', 'Could not load satellite image.')}</p>}
                 <button
@@ -1156,6 +1171,10 @@ function App() {
                 <small>{t('Gemeinsame Aufnahmezeitpunkte abspielen', 'Play matching image times')}</small></span>
             </label>
             {syncActive && <div className="radar-timeline">
+              <div role="group" aria-label={t('Deckkraft', 'Opacity')}>
+                {radarOpacityControl}
+                {satelliteOpacityControl}
+              </div>
               <p className="radar-range-note">{t('Nur gemeinsame Aufnahmezeiten; wegen der Satellitenverzögerung endet die Wiedergabe ggf. früher als das aktuelle Radar.', 'Only matching image times; satellite delays may make playback end earlier than the latest radar.')}</p>
               {syncTime ? <>
                 <time dateTime={syncTime}>{new Intl.DateTimeFormat(locale, {
@@ -1324,6 +1343,41 @@ function App() {
           </div>
           </MobilePanel>
         </aside>
+        <div className="panel-resizer"
+          role="separator" aria-orientation="vertical" aria-controls="weather-controls"
+          aria-label={t('Breite des Seitenpanels', 'Sidebar width')}
+          aria-valuemin={MIN_PANEL_WIDTH} aria-valuemax={Math.max(MIN_PANEL_WIDTH, panelMax)}
+          aria-valuenow={Math.max(MIN_PANEL_WIDTH, panelWidth)} tabIndex={0}
+          onPointerDown={(event) => {
+            if (!event.isPrimary || event.button !== 0) return
+            event.preventDefault()
+            event.currentTarget.focus({ preventScroll: true })
+            event.currentTarget.setPointerCapture(event.pointerId)
+            panelDrag.current = { pointerId: event.pointerId, x: event.clientX, width: panelWidth }
+          }}
+          onPointerMove={(event) => {
+            const drag = panelDrag.current
+            if (drag?.pointerId === event.pointerId) {
+              setPanelWidth(clampPanelWidth(drag.width + event.clientX - drag.x, panelMax))
+            }
+          }}
+          onLostPointerCapture={(event) => {
+            if (panelDrag.current?.pointerId === event.pointerId) panelDrag.current = null
+          }}
+          onKeyDown={(event) => {
+            let width
+            switch (event.key) {
+              case 'ArrowLeft': width = panelWidth - 16; break
+              case 'ArrowRight': width = panelWidth + 16; break
+              case 'Home': width = MIN_PANEL_WIDTH; break
+              case 'End': width = panelMax; break
+              default: return
+            }
+            event.preventDefault()
+            setPanelWidth(clampPanelWidth(width, panelMax))
+          }}
+          onDoubleClick={() => setPanelWidth(DEFAULT_PANEL_WIDTH)}
+        />
         <div ref={mapElement} className="map" inert={mobile && !!activePanel} aria-label={t('Wetterkarte Europa', 'Europe weather map')} />
       </section>
       <footer className="desktop-footer">

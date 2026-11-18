@@ -60,6 +60,11 @@ Mit Einwilligung gespeicherte Ebeneneinstellungen haben weiterhin Vorrang.
 Auf dem Desktop scrollt die Seitenleiste bei einer Stations-, Kartenpunkt-,
 Suchtreffer- oder Warnflächenauswahl automatisch zum Detailbereich und hebt
 ihn kurz hervor. Die Karte selbst wird dadurch nicht verschoben.
+Die Breite der Desktop-Seitenleiste lässt sich am Griff zur Karte hin ziehen
+oder mit den Pfeiltasten ändern. Ein Doppelklick setzt die Standardbreite zurück.
+Schlägt eine Warnungsaktualisierung fehl, bleiben bereits geladene, noch nicht
+abgelaufene Warnflächen mit dem letzten Abrufzeitpunkt sichtbar. Die Anzeige
+weist dann auf den veralteten Stand hin; er ist keine Entwarnung.
 
 ### Mobile Bedienung
 
@@ -75,7 +80,10 @@ Das untere Dock steuert Radar bzw. Satellit; bei zwei aktiven Ebenen wechselt
 man über die beschrifteten Tasten zwischen den Zeitlisten. Das Schließen im
 Dock deaktiviert nur die gesteuerte Ebene. Synchronisation bleibt über das
 Ebenen-Panel und direkt über „Synchron“ im Dock verfügbar; dann steuern beide Dock-Tasten dieselben gemeinsamen
-Zeitpunkte. Deckkraft und Quellenhinweise bleiben im Ebenen- bzw. Menü-Panel.
+Zeitpunkte. Über „◐“ im kompakten Dock lässt sich die Deckkraft der gewählten
+Ebene einstellen. Bei synchroner Wiedergabe stehen im Dock und im Ebenen-Panel
+getrennte Regler für Radar und Satellit zur Verfügung, jeweils von 0 bis 100 %.
+Quellenhinweise bleiben im Ebenen- bzw. Menü-Panel.
 Panelwechsel unterbrechen weder Wiedergabe noch Vorladen oder Kartenzustand.
 Radar- und Satellitenzeitlisten werden alle fünf Minuten geprüft
 (Satellitenaufnahmen weiterhin in 15-Minuten-Abständen); die ausgewählte
@@ -224,7 +232,7 @@ Die Tests decken unter anderem folgende Invarianten ab:
 - Radarschwellen, Farben, transparente Fehlwerte und Projektionsreferenzen.
 - Zeitpunkterhalt bei Radaraktualisierungen und exakte gemeinsame Wiedergabezeiten.
 - Vereinigung von Warnflächen einschließlich Löchern, getrennter Gebiete und unveränderter Eingangsdaten.
-- Filterung abgelaufener, stornierter und nicht öffentlicher Warnungen.
+- Filterung abgelaufener, stornierter und nicht öffentlicher Warnungen; vollständiger seitenweiser Abruf auch bei mehr als 20.000 Gemeinde-Einträgen.
 - Länderfilter, deutsche Postleitzahlen sowie Fehler- und Timeoutweitergabe der Ortssuche mit simulierten Upstream-Antworten.
 - Persistenz von Stationsausfällen und Wiederherstellungen.
 - API-Healthcheck, erlaubte HTTP-Methoden und globale Anfragebegrenzung.

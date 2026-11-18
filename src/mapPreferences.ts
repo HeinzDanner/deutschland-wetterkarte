@@ -4,8 +4,10 @@ export const MAP_VIEW_KEY = 'weather-map-view'
 export const MAP_LAYERS_KEY = 'weather-map-layers'
 export const DEFAULT_VIEW = { center: [10.5, 51.5], zoom: 4.6 }
 export const DEFAULT_LAYERS = {
-  opera: true, satellite: true, stations: true, warnings: true, satelliteOpacity: 0.95,
+  opera: true, satellite: true, stations: true, warnings: true, satelliteOpacity: 0.95, radarOpacity: 1,
 }
+
+type SavedLayers = Omit<typeof DEFAULT_LAYERS, 'radarOpacity'> & { radarOpacity?: number }
 
 export function validView(value: unknown): value is typeof DEFAULT_VIEW {
   if (!value || typeof value !== 'object') return false
@@ -16,13 +18,15 @@ export function validView(value: unknown): value is typeof DEFAULT_VIEW {
     Number.isFinite(view.zoom) && view.zoom >= 3.5 && view.zoom <= 12
 }
 
-export function validLayers(value: unknown): value is typeof DEFAULT_LAYERS {
+export function validLayers(value: unknown): value is SavedLayers {
   if (!value || typeof value !== 'object') return false
-  const layers = value as typeof DEFAULT_LAYERS
+  const layers = value as SavedLayers
   return ['opera', 'satellite', 'stations', 'warnings'].every((key) =>
     typeof Reflect.get(layers, key) === 'boolean') &&
     Number.isFinite(layers.satelliteOpacity) && layers.satelliteOpacity >= 0 &&
-    layers.satelliteOpacity <= 1
+    layers.satelliteOpacity <= 1 &&
+    (layers.radarOpacity === undefined ||
+      Number.isFinite(layers.radarOpacity) && layers.radarOpacity >= 0 && layers.radarOpacity <= 1)
 }
 
 export function readPreference<T>(key: string, fallback: T, valid: (value: unknown) => value is T): T {

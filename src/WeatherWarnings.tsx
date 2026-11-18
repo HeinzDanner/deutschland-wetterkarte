@@ -90,7 +90,9 @@ export function WeatherWarnings({ map, visible, onChange, onDetails, onSummary, 
   const { t, locale, mobileText } = useLanguage()
   const [reload, setReload] = useState(0)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
+  const [renderError, setRenderError] = useState(false)
+  const error = fetchError || renderError
   const [features, setFeatures] = useState<WarningFeature[]>([])
   const [selected, setSelected] = useState<Warning[]>([])
   const [fetchedAt, setFetchedAt] = useState<string | null>(null)
@@ -202,7 +204,10 @@ export function WeatherWarnings({ map, visible, onChange, onDetails, onSummary, 
     const source = areasLayer.current?.getSource()
     source?.clear()
     const current = features.filter((feature) => Date.parse((feature.get('warning') as Warning).expires) > now)
-    if (!current.length || !source) return
+    if (!current.length || !source) {
+      setRenderError(false)
+      return
+    }
     try {
       const format = new GeoJSON()
       const objects = current.map((feature) => ({
@@ -213,19 +218,26 @@ export function WeatherWarnings({ map, visible, onChange, onDetails, onSummary, 
       }))
       const merged = mergeWarningAreas(objects)
       source.addFeatures(format.readFeatures({ type: 'FeatureCollection', features: merged }))
+      setRenderError(false)
     } catch (reason) {
       console.error('DWD warning areas could not be merged:', reason)
-      setError(true)
+      setRenderError(true)
       layer.current?.getSource()?.clear()
       setSelected([])
     }
   }, [features, now, map, visible])
 
   useEffect(() => {
-    setSelected([])
+    if (!visible) setSelected([])
+  }, [visible])
+
+  useEffect(() => {
     if (!visible) return
     const controller = new AbortController()
+    let running = false
     const refresh = async () => {
+      if (running) return
+      running = true
       setLoading(true)
       try {
         const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(65000)])
@@ -242,7 +254,7 @@ export function WeatherWarnings({ map, visible, onChange, onDetails, onSummary, 
         }
         setFeatures(parsed)
         setFetchedAt(data.fetchedAt)
-        setError(false)
+        setFetchError(false)
         setNow(Date.now())
         setSelected((previous) => previous.flatMap((warning) => {
           const replacement = parsed.find((feature) => (feature.get('warning') as Warning).identifier === warning.identifier)
@@ -251,11 +263,9 @@ export function WeatherWarnings({ map, visible, onChange, onDetails, onSummary, 
       } catch (reason) {
         if (controller.signal.aborted) return
         console.warn('DWD warnings failed:', reason)
-        setError(true)
-        setFeatures([])
-        setSelected([])
-        setFetchedAt(null)
+        setFetchError(true)
       } finally {
+        running = false
         if (!controller.signal.aborted) setLoading(false)
       }
     }
@@ -294,13 +304,15 @@ export function WeatherWarnings({ map, visible, onChange, onDetails, onSummary, 
           <p className="radar-range-note">{t('Schraffierte Flächen mit gestricheltem Rand und „Wetterwarnung“ kennzeichnen aufbereitete Warngebiete, nicht die Regenintensität.', 'Hatched areas with dashed outlines and “Weather warning” labels indicate processed warning areas, not rainfall intensity.')}</p>
           </div>
           {loading && <p role="status">{t('Warnungen werden geladen …', 'Loading warnings …')}</p>}
-          {error && <p className="layer-error" role="alert">{t('Warnungen nicht verfügbar. Daraus lässt sich keine Warnfreiheit ableiten.', 'Warnings unavailable. This does not mean there are no warnings.')}</p>}
+          {error && <p className="layer-error" role="alert">{fetchError && !renderError && fetchedAt && count
+            ? t('Aktualisierung fehlgeschlagen. Noch nicht abgelaufene Warnungen vom letzten Abruf bleiben sichtbar. Neue oder aufgehobene Warnungen können fehlen.', 'Update failed. Unexpired warnings from the last fetch remain visible. New or cancelled warnings may not be reflected.')
+            : t('Warnungen nicht verfügbar. Daraus lässt sich keine Warnfreiheit ableiten.', 'Warnings unavailable. This does not mean there are no warnings.')}</p>}
           {!detailsOnly && !error && fetchedAt && <p role="status">
             {count ? t(`${count} Warnmeldungen · Gebiete anklicken für Details.`, `${count} warnings · click an area for details.`)
               : t('Keine Warnungen in dieser Darstellung. Daraus lässt sich keine Warnfreiheit ableiten.', 'No warnings in this presentation. This does not mean there are no warnings.')}
           </p>}
           {fetchedAt && <small>{t('Abgerufen', 'Fetched')}: {format.format(new Date(fetchedAt))}</small>}
-          <button type="button" className="reload-button" onClick={() => setReload((value) => value + 1)}>
+          <button type="button" className="reload-button" disabled={loading} onClick={() => setReload((value) => value + 1)}>
             {t('↻ Warnungen neu laden', '↻ Reload warnings')}
           </button>
           <details hidden={detailsOnly}>

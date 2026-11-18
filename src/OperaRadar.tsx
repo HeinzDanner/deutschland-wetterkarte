@@ -19,6 +19,7 @@ type FrameList = {
 type Props = {
   map: OlMap | null
   active: boolean
+  opacity: number
   onChange: (active: boolean) => void
   synchronized: boolean
   synchronizedTime: string | null
@@ -99,7 +100,7 @@ function createBuffer(onReady: (time: string) => void) {
   }
 }
 
-export function useOperaRadar({ map, active, synchronized, synchronizedTime, onFrames, onStatus }: Omit<Props, 'onChange'>) {
+export function useOperaRadar({ map, active, opacity, synchronized, synchronizedTime, onFrames, onStatus }: Omit<Props, 'onChange'>) {
   const { t, locale, language } = useLanguage()
   const timeFormat = new Intl.DateTimeFormat(locale, {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -151,6 +152,10 @@ export function useOperaRadar({ map, active, synchronized, synchronizedTime, onF
       buffer.current = null
     }
   }, [map, active, reload])
+
+  useEffect(() => {
+    layer.current?.setOpacity(opacity)
+  }, [opacity, map, active, reload])
 
   useEffect(() => {
     setPlaying(false)
