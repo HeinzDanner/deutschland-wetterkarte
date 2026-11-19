@@ -6,7 +6,7 @@ Eine Full-Stack-Webanwendung mit React, TypeScript und OpenLayers sowie einem sc
 
 Der technische Schwerpunkt liegt nicht nur auf der Visualisierung: Die Anwendung verarbeitet GeoTIFF-Radardaten zu PNGs, koordiniert asynchrone Bildabrufe und führt Warngeometrien zusammen, ohne deren ursprüngliche lokale Informationen zu verlieren.
 
-**Erste Veröffentlichung:** Anwendungscode unter **AGPL-3.0-or-later**, mit Docker Compose und Caddy selbst betreibbar. Die Bereitstellung ist für `smartcontentstudio.de` vorgesehen; ein erfolgreicher Livebetrieb wird hier erst nach dem tatsächlichen Start bestätigt.
+**Live:** Die Wetterkarte ist unter **[smartcontentstudio.de](https://smartcontentstudio.de/)** verfügbar. Anwendungscode unter **AGPL-3.0-or-later**, mit Docker Compose und Caddy selbst betreibbar.
 
 [Einblicke](#einblicke) · [Funktionen](#funktionen) · [Architektur](#architektur) · [Lokal starten](#lokal-starten) · [Tests](#tests-und-qualitätsprüfung) · [Deployment](#deployment) · [Lizenzen](#datenquellen-und-lizenzen)
 
