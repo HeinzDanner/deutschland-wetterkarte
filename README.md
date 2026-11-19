@@ -43,14 +43,14 @@ Dienstbedingungen sind unter [Datenquellen und Lizenzen](#datenquellen-und-lizen
 
 | Bereich | Umsetzung |
 | --- | --- |
-| **Europa-Radar** | EUMETNET OPERA RATE-Komposit mit 2-km-Raster, Farbskala in mm/h, verfügbaren 15-Minuten-Zeitpunkten und bis zu 13 Bildern aus den letzten vier Stunden. |
+| **Europa-Radar** | EUMETNET OPERA RATE-Komposit mit 2-km-Raster, Farbskala in mm/h, einstellbarer Deckkraft, verfügbaren 15-Minuten-Zeitpunkten und bis zu 13 Bildern aus den letzten vier Stunden. |
 | **Satellit** | EUMETSAT-Meteosat-Infrarotbilder mit Zeitleiste und einstellbarer Deckkraft. |
-| **Gemeinsame Wiedergabe** | Radar und Satellit anhand tatsächlich gemeinsamer Zeitpunkte abspielen; die nächste Wiedergabestufe wartet auf beide Bilder. |
+| **Gemeinsame Wiedergabe** | Radar und Satellit anhand tatsächlich gemeinsamer Zeitpunkte abspielen; die nächste Wiedergabestufe wartet auf beide Bilder. Deckkraft beider Ebenen getrennt von 0 bis 100 % einstellbar. |
 | **Stationsnetz** | 100 ausgewählte deutsche DWD-Stationen mit Temperatur, Luftfeuchte und Wind; Cluster mit Durchschnittstemperatur und Zoom zu Einzelstationen. |
 | **Wetterwarnungen** | Eigene Darstellung auf Basis von DWD-Warnungen mit Schraffur, Schweregrad und Beschriftung; Originaltexte, Gültigkeit und lokale Zuordnung per Klick. Kein amtlicher Warnkanal. Die Warnabdeckung ist Deutschland, nicht ganz Europa. |
 | **Ortssuche** | Europäische Länderauswahl mit Deutschland als Vorauswahl, Ortsnamen sowie deutsche Postleitzahlen. Treffer zeigen Region und Land. |
 | **Punktvorhersage** | 24-Stunden-Verlauf und Sieben-Tage-Ausblick für Suchtreffer, Stationen oder Kartenklicks über Open-Meteo/DWD ICON, mit lokaler Zeitzone. Verfügbarkeit abhängig vom Datenanbieter. |
-| **Bedienung** | Deutsche und englische Oberfläche, eigene Mobile-Shell bis einschließlich 700 px mit Vollbild-Panels, schwebender Suche und gemeinsamem Timeline-Dock; optional gespeicherte Karteneinstellungen. |
+| **Bedienung** | Deutsche und englische Oberfläche, verstellbare Desktop-Seitenleiste sowie eigene Mobile-Shell bis einschließlich 700 px mit Vollbild-Panels, schwebender Suche und ausblendbarem Timeline-Dock; optional gespeicherte Karteneinstellungen. |
 | **Transparenz** | Sichtbare Kartenattribution, Quellen-/Lizenzübersicht, Wetterhinweise und ausdrücklich gekennzeichnete Entwürfe für Impressum und Datenschutz. |
 
 Die geografische Abdeckung unterscheidet sich je nach Quelle. Eine europaweite Ortssuche bedeutet weder flächendeckende Radarversorgung noch europaweite Stations- oder Warnungsdaten.
@@ -61,16 +61,20 @@ Auf dem Desktop scrollt die Seitenleiste bei einer Stations-, Kartenpunkt-,
 Suchtreffer- oder Warnflächenauswahl automatisch zum Detailbereich und hebt
 ihn kurz hervor. Die Karte selbst wird dadurch nicht verschoben.
 Die Breite der Desktop-Seitenleiste lässt sich am Griff zur Karte hin ziehen
-oder mit den Pfeiltasten ändern. Ein Doppelklick setzt die Standardbreite zurück.
+oder bei fokussiertem Griff mit den Pfeiltasten ändern. Ein Doppelklick setzt
+die Standardbreite zurück. Die Breite wird nicht dauerhaft gespeichert.
+
 Schlägt eine Warnungsaktualisierung fehl, bleiben bereits geladene, noch nicht
 abgelaufene Warnflächen mit dem letzten Abrufzeitpunkt sichtbar. Die Anzeige
-weist dann auf den veralteten Stand hin; er ist keine Entwarnung.
+weist dann auf den veralteten Stand hin; neue oder aufgehobene Warnungen können
+fehlen. Er ist keine Entwarnung.
 
 ### Mobile Bedienung
 
 Bis einschließlich **700 px Fensterbreite** bleibt die Karte bildschirmfüllend,
 auch im Querformat. Die Suchleiste öffnet die Ortssuche; rechts öffnen die
-schwebenden Tasten Ebenen, den zuletzt gesteuerten Zeitlayer und das Menü.
+schwebenden Tasten Ebenen und Menü. Die Uhr-Taste blendet die Zeitleiste ein
+oder aus; ohne aktive Zeitebene aktiviert sie die zuletzt gesteuerte Ebene.
 Suche, Ebenen, Vorhersage, Warnungsdetails und Menü teilen sich ein
 Vollbild-Panel mit Zurück-Pfeil. Zurück, Escape, der schmale abgedunkelte Rand
 oberhalb des Panels oder eine Abwärts-Wischgeste am Kopf schließen es.
@@ -79,9 +83,14 @@ Der Tastaturfokus bleibt im geöffneten Panel.
 Das untere Dock steuert Radar bzw. Satellit; bei zwei aktiven Ebenen wechselt
 man über die beschrifteten Tasten zwischen den Zeitlisten. „×“ blendet nur
 das Dock aus; über die Uhr-Taste am Kartenrand erscheint es wieder. Aktive
-Ebenen und die Wiedergabe laufen dabei unverändert weiter. Synchronisation bleibt über das
-Ebenen-Panel und direkt über „Synchron“ im Dock verfügbar; dann steuern beide Dock-Tasten dieselben gemeinsamen
-Zeitpunkte. Über „◐“ im kompakten Dock lässt sich die Deckkraft der gewählten
+Ebenen und die Wiedergabe laufen dabei unverändert weiter. Zeitangabe und
+Zeitschieber liegen neben den Abspieltasten. Die Ladeanzeige hat einen fest
+reservierten Platz, damit „Bild wird geladen …“ die Panelhöhe beim Abspielen
+nicht verändert.
+
+Synchronisation bleibt über das Ebenen-Panel und direkt über „Synchron“ im Dock
+verfügbar; dann steuern beide Dock-Tasten dieselben gemeinsamen Zeitpunkte.
+Über „◐“ im kompakten Dock lässt sich die Deckkraft der gewählten
 Ebene einstellen. Bei synchroner Wiedergabe stehen im Dock und im Ebenen-Panel
 getrennte Regler für Radar und Satellit zur Verfügung, jeweils von 0 bis 100 %.
 Quellenhinweise bleiben im Ebenen- bzw. Menü-Panel.
@@ -95,7 +104,7 @@ Kartenausschnitt, sofern Warnungen eingeschaltet und erfolgreich geladen sind.
 Bevorstehende Warnungen bleiben auf der Karte sichtbar, zählen aber noch nicht
 zum Chip. Ein fehlender Chip ist **keine Entwarnung**. Stations- und
 Warnflächenklicks öffnen ihre Details; „Auf Karte zeigen“ führt zur Position.
-Offene Panels und Dock-Auswahl werden nicht gespeichert. Oberhalb von 700 px
+Offene Panels, Dock-Auswahl und das Ausblenden des Docks werden nicht gespeichert. Oberhalb von 700 px
 bleibt die bisherige Desktop-Bedienung erhalten.
 
 Mobil sind die Kartenquellen ganz unten über das kleine Info-Symbol
@@ -167,6 +176,16 @@ In der lokalen Entwicklung ersetzt der Vite-Devserver Caddy und leitet `/api` an
 **Zeitliche Konsistenz.** Die gemeinsame Wiedergabe verwendet die exakte Schnittmenge der Radar- und Satellitenzeitpunkte, keine ersatzweise „nahegelegenen“ Bilder. Langsame Abrufe bremsen die Wiedergabe; Ladefehler stoppen sie mit einer Meldung. Die Ebenen laden ihre Bilder separat – ein atomarer gemeinsamer Bildtausch wird nicht zugesichert. Bei einer automatischen Radaraktualisierung bleibt die Auswahl erhalten oder wechselt zum nächstgelegenen noch verfügbaren Zeitpunkt.
 
 **Warnflächen ohne Gemeinde-Raster.** `polygon-clipping` vereinigt benachbarte Flächen nur bei übereinstimmenden inhaltlichen Warnmerkmalen. Löcher und getrennte Teilflächen bleiben erhalten. Die ursprünglichen Geometrien dienen weiterhin der Trefferprüfung, damit ein Klick den passenden lokalen Warntext liefert.
+
+**Warnungsabruf bei großräumigen Wetterlagen.** Das Backend fragt den DWD mit
+bis zu 2.000 Gemeinde-Einträgen pro Seite ab, ohne feste Grenze bei 20.000
+Einträgen. Bereits abgelaufene, nicht öffentliche und stornierte Meldungen
+werden möglichst schon beim DWD gefiltert und anschließend lokal geprüft.
+Bevorstehende Warnungen bleiben enthalten. Gleichzeitige Abrufe teilen sich
+eine laufende Anfrage; erfolgreiche Ergebnisse werden eine Minute
+zwischengespeichert. Die Oberfläche prüft alle fünf Minuten auf neue Daten.
+Der Umfang der Flächen und die Antwortzeit des DWD können weiterhin zu
+Wartezeiten führen.
 
 **Fehlende Werte bleiben fehlend.** Messlücken erscheinen als „–“ statt als Null und unterbrechen Diagrammlinien. Nicht verfügbare Stationen werden gesondert ausgewiesen. Eine persistente Historie dokumentiert Stationsausfälle und Wiederherstellungen bei tatsächlichen Datenaktualisierungen; sie ist kein kontinuierlicher Überwachungsdienst.
 
