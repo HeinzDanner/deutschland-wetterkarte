@@ -1268,7 +1268,7 @@ footer {
   .timeline-dock-position input { min-height: 28px; }
   .timeline-dock-opacity { border-top: 1px solid #54718a; margin-top: 4px; padding-inline: 4px; }
   .timeline-dock-opacity input { min-height: 44px; }
-  .timeline-dock-status { display: block; min-height: 1em; font-size: 0.7rem; color: #afc1cf; }
+  .timeline-dock-status { min-height: 1.4em; line-height: 1.4; font-size: 0.7rem; color: #afc1cf; }
   .timeline-dock-error { font-size: 0.75rem; color: #f5b3a9; display: flex; align-items: center; gap: 8px; max-height: 112px; overflow-y: auto; }
   .timeline-dock-error button { font-size: 0.75rem; flex-shrink: 0; }
 

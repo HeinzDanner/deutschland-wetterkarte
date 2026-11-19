@@ -77,8 +77,9 @@ oberhalb des Panels oder eine Abwärts-Wischgeste am Kopf schließen es.
 Der Tastaturfokus bleibt im geöffneten Panel.
 
 Das untere Dock steuert Radar bzw. Satellit; bei zwei aktiven Ebenen wechselt
-man über die beschrifteten Tasten zwischen den Zeitlisten. Das Schließen im
-Dock deaktiviert nur die gesteuerte Ebene. Synchronisation bleibt über das
+man über die beschrifteten Tasten zwischen den Zeitlisten. „×“ blendet nur
+das Dock aus; über die Uhr-Taste am Kartenrand erscheint es wieder. Aktive
+Ebenen und die Wiedergabe laufen dabei unverändert weiter. Synchronisation bleibt über das
 Ebenen-Panel und direkt über „Synchron“ im Dock verfügbar; dann steuern beide Dock-Tasten dieselben gemeinsamen
 Zeitpunkte. Über „◐“ im kompakten Dock lässt sich die Deckkraft der gewählten
 Ebene einstellen. Bei synchroner Wiedergabe stehen im Dock und im Ebenen-Panel

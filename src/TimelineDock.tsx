@@ -4,12 +4,13 @@ import type { LayerPlayback } from './useLayerPlayback'
 
 export type TimeLayer = 'radar' | 'satellite'
 
-export function TimelineDock({ active, radar, satellite, onSelect, onClose, synchronized, onSynchronize, opacityControls }: {
+export function TimelineDock({ active, hidden, radar, satellite, onSelect, onHide, synchronized, onSynchronize, opacityControls }: {
   active: TimeLayer | null
+  hidden: boolean
   radar: LayerPlayback | null
   satellite: LayerPlayback | null
   onSelect: (layer: TimeLayer) => void
-  onClose: (layer: TimeLayer) => void
+  onHide: () => void
   synchronized: boolean
   onSynchronize: (enabled: boolean) => void
   opacityControls: ReactNode
@@ -20,7 +21,7 @@ export function TimelineDock({ active, radar, satellite, onSelect, onClose, sync
   const playback = active === 'radar' ? radar : active === 'satellite' ? satellite : null
   if (!playback || !active) return null
   const { frames, index, playing, time, loading, error, select, toggle, reload } = playback
-  return <section className="timeline-dock" aria-label={mobileText('timeline')}>
+  return <section id="mobile-timeline-dock" className="timeline-dock" hidden={hidden} aria-label={mobileText('timeline')}>
     <div className="timeline-dock-heading">
       <div role="group" aria-label={mobileText('timeline')}>
         {radar && <button type="button" aria-pressed={active === 'radar'} onClick={() => onSelect('radar')}>{mobileText('radar')}</button>}
@@ -33,7 +34,7 @@ export function TimelineDock({ active, radar, satellite, onSelect, onClose, sync
       <button type="button" className="timeline-opacity-toggle" title={t('Deckkraft', 'Opacity')}
         aria-label={t('Deckkraft', 'Opacity')} aria-controls={opacityId} aria-expanded={opacityOpen}
         onClick={() => setOpacityOpen((open) => !open)}>◐</button>
-      <button type="button" onClick={() => onClose(active)} aria-label={mobileText('closeLayer')}>×</button>
+      <button type="button" onClick={onHide} aria-label={mobileText('hideTimeline')} title={mobileText('hideTimeline')}>×</button>
     </div>
     <div className="timeline-dock-controls">
       <button type="button" disabled={!frames.length || index <= 0} onClick={() => select(index - 1)} aria-label={mobileText('previous')}>‹</button>
@@ -53,6 +54,6 @@ export function TimelineDock({ active, radar, satellite, onSelect, onClose, sync
     <div id={opacityId} className="timeline-dock-opacity" hidden={!opacityOpen}>{opacityControls}</div>
     {error ? <div className="timeline-dock-error" role="alert"><span>{error}</span>
       <button type="button" onClick={reload}>{mobileText('retry')}</button></div>
-      : loading && <span className="timeline-dock-status" role="status">{mobileText('loading')}</span>}
+      : <div className="timeline-dock-status" role="status">{loading ? mobileText('loading') : ''}</div>}
   </section>
 }

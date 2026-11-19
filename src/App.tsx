@@ -107,6 +107,8 @@ function App() {
     }
   }, [])
   const [activeTimeline, setActiveTimeline] = useState<TimeLayer | null>(initialLayers.opera ? 'radar' : initialLayers.satellite ? 'satellite' : null)
+  const [timelineHidden, setTimelineHidden] = useState(false)
+  const timelineButton = useRef<HTMLButtonElement>(null)
   const lastTimeline = useRef<TimeLayer>(initialLayers.satellite && !initialLayers.opera ? 'satellite' : 'radar')
   const [warningLevel, setWarningLevel] = useState<number | null>(null)
   const [warningOverview, setWarningOverview] = useState(0)
@@ -843,16 +845,22 @@ function App() {
           </div>
           <div className="mobile-edge-buttons">
             <button type="button" aria-label={mobileText('layers')} title={mobileText('layers')} onClick={() => setActivePanel('layers')}>▱</button>
-            <button type="button" aria-label={mobileText('timeLayers')} title={mobileText('timeLayers')}
-              aria-pressed={!!activeTimeline} onClick={() => {
+            <button type="button" ref={timelineButton} aria-label={mobileText('timeLayers')} title={mobileText('timeLayers')}
+              aria-controls={activeTimeline ? 'mobile-timeline-dock' : undefined}
+              aria-expanded={!!activeTimeline && !timelineHidden} onClick={() => {
+                if (activeTimeline) {
+                  setTimelineHidden((hidden) => !hidden)
+                  return
+                }
                 const layer = lastTimeline.current
                 if (layer === 'radar') { setOperaVisible(true); setRadarVisible(false) }
                 else setSatelliteVisible(true)
                 setActiveTimeline(layer)
+                setTimelineHidden(false)
               }}>◷</button>
             <button type="button" aria-label={mobileText('menu')} title={mobileText('menu')} onClick={() => setActivePanel('menu')}>⋯</button>
           </div>
-          <TimelineDock active={activeTimeline}
+          <TimelineDock active={activeTimeline} hidden={timelineHidden}
             synchronized={syncActive} onSynchronize={synchronizePlayback}
             opacityControls={<>
               {(syncActive || activeTimeline === 'radar') && radarOpacityControl}
@@ -860,9 +868,9 @@ function App() {
             </>}
             radar={operaVisible ? syncActive ? syncPlayback : opera.playback : null}
             satellite={satelliteVisible ? syncActive ? syncPlayback : satellitePlayback : null}
-            onSelect={setActiveTimeline} onClose={(layer) => {
-              if (layer === 'radar') setOperaVisible(false)
-              else setSatelliteVisible(false)
+            onSelect={setActiveTimeline} onHide={() => {
+              setTimelineHidden(true)
+              timelineButton.current?.focus({ preventScroll: true })
             }} />
         </div>}
         <aside className="control-panel" id="weather-controls"

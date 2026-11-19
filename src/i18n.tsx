@@ -23,7 +23,7 @@ const mobileMessages = {
   pause: ['Pause', 'Pause'],
   previous: ['Eine Aufnahme zurück', 'Previous image'],
   next: ['Eine Aufnahme vor', 'Next image'],
-  closeLayer: ['Zeitlayer ausschalten', 'Turn off time layer'],
+  hideTimeline: ['Zeitleiste ausblenden', 'Hide timeline'],
   showOnMap: ['Auf Karte zeigen', 'Show on map'],
   loading: ['Bild wird geladen …', 'Loading image …'],
   unavailable: ['Nicht verfügbar', 'Unavailable'],
